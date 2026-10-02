@@ -1,0 +1,20 @@
+# Datos con licencia restringida: nunca se suben al repositorio
+data/raw/*
+!data/raw/.gitkeep
+
+# Datos procesados pesados (se regeneran con los scripts; si quieres versionarlos, comenta estas líneas)
+data/processed/*.csv
+!data/processed/.gitkeep
+
+# Entorno y caches de Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Config con credenciales o rutas locales
+configs/local_*.yaml
+.env
+
+# Sistema
+.DS_Store

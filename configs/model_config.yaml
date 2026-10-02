@@ -1,0 +1,35 @@
+# Configuración del modelo base como variable controlada.
+# Fijar esto aquí responde a la observación de que "LLaMA o Qwen, 7B-13B" no era
+# una especificación reproducible (correction del reporte de revisión, §6.4).
+#
+# Reemplazar los valores de ejemplo por la versión exacta elegida antes de correr
+# cualquier experimento, y no cambiarlos entre condiciones B1/B3/B4/B5/B6.
+
+modelo:
+  nombre: "Qwen/Qwen3-8B-Instruct"   # ejemplo, fijar el repositorio/checkpoint exacto
+  revision: ""                        # commit o tag exacto del checkpoint, si aplica
+  cuantizacion: "4-bit (bitsandbytes)"
+  contexto_maximo_tokens: 8192
+
+decodificacion:
+  temperatura_percepcion: 0.0   # determinista: solo extrae indicios, no debe variar
+  temperatura_razonamiento: 0.3
+  temperatura_resolucion: 0.7   # > 0 porque la confianza se calcula por self-consistency
+  top_p: 0.9
+  top_k: 40
+  semilla: 42
+
+self_consistency:
+  k_muestras_resolucion: 5
+  umbral_confianza_tau: 0.6
+  max_iteraciones_meta_agente: 2
+
+repeticiones_experimento:
+  n_semillas: 3
+  semillas: [13, 42, 2026]
+
+formato_salida:
+  tipo: "json_estructurado"
+  reintentos_maximos: 2
+  campo_etiqueta: "label"
+  valores_permitidos: ["POS", "NEG", "NEU"]
