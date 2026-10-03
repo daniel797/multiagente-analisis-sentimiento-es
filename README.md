@@ -50,7 +50,7 @@ El corpus **InterTASS / TASS 2020 multivariante** no es de descarga directa ni d
 Para reproducir el proyecto:
 
 1. Registrarse y descargar el corpus en tass.sepln.org (ediciones ES, MX, PE, CL, CR, UY de TASS 2020).
-2. Colocar los archivos originales, sin modificar, en `data/raw/<variedad>/` (por ejemplo `data/raw/PE/`, `data/raw/MX/`, etc.).
+2. Colocar los archivos originales, sin modificar, en `data/`
 3. Correr `scripts/data/consolidate_dataset.py` para unificarlos en un único archivo tabular.
 4. Correr `scripts/data/split_dataset.py` para generar las particiones de desarrollo, validación y prueba bloqueada.
 5. (Opcional, recomendado) Correr `scripts/data/audit_phenomena.py` sobre el conjunto de desarrollo para contar ejemplos de sarcasmo, diminutivos afectivos, doble negación y code-switching, antes de diseñar los prompts de los agentes.
