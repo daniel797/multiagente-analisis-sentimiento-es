@@ -12,6 +12,18 @@ El proyecto compara, de forma experimental y controlada, un sistema **monoagente
 
 No se entrena ni se ajusta ningún modelo. El LLM base se usa preentrenado tal cual; lo que se diseña y evalúa es cómo se coordinan las llamadas que se le hacen.
 
+## Solo inferencia, sin entrenamiento
+
+Este punto se presta a confusión, así que queda explícito: el proyecto **no incluye ninguna etapa de entrenamiento ni de fine-tuning**. El modelo base se descarga o se consume por API exactamente como se publica, sin ajustar sus pesos, ni para la condición monoagente ni para la multiagente.
+
+El corpus (TASS 2020) se usa en tres momentos, pero en ninguno para entrenar:
+
+- **Desarrollo:** se analizan los errores del monoagente para escribir mejor los prompts de los agentes (ingeniería de prompts, no aprendizaje de parámetros).
+- **Validación:** se elige el umbral de confianza τ y `max_iter` del meta-agente, por prueba y error sobre resultados, sin tocar el modelo.
+- **Prueba bloqueada:** se mide el desempeño una sola vez, al final.
+
+Esto es deliberado: si se entrenara o ajustara el modelo en alguna de las dos condiciones, ya no se podría saber si una mejora viene de la coordinación entre agentes o del entrenamiento extra. Dejar el modelo fijo y sin tocar en ambas condiciones es lo que permite atribuir limpiamente cualquier diferencia de Macro-F1 a la arquitectura.
+
 Este repositorio documenta el avance del proyecto semana a semana. El estado actual corresponde al **avance de la Semana 2**: diseño del flujo reproducible (ver `docs/`). Los scripts de este repositorio preparan el terreno para la fase experimental: consolidar el corpus, auditar fenómenos lingüísticos y particionar los datos sin fuga de información, antes de implementar los agentes.
 
 ## Estructura del repositorio
@@ -58,7 +70,7 @@ Ninguno de estos scripts entrena un modelo: preparan los datos. La implementaci�
 
 ## Modelo base
 
-La versión exacta del modelo (familia, tamaño, cuantización, parámetros de decodificación y semilla) se fija en `configs/model_config.yaml`, siguiendo la observación de que "LLaMA o Qwen, 7B–13B" no era una especificación reproducible por sí sola.
+Se fijó **Salamandra-7B-Instruct** (BSC-LT), un modelo abierto entrenado específicamente en español y lenguas cooficiales, en vez de un multilingüe genérico. La versión exacta (familia, tamaño, cuantización, parámetros de decodificación y semilla) queda documentada en `configs/model_config.yaml`, siguiendo la observación de que "LLaMA o Qwen, 7B–13B" no era una especificación reproducible por sí sola. El modelo se usa preentrenado, sin fine-tuning (ver sección anterior).
 
 ## Cómo correr esto
 

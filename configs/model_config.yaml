@@ -2,14 +2,27 @@
 # Fijar esto aquí responde a la observación de que "LLaMA o Qwen, 7B-13B" no era
 # una especificación reproducible (correction del reporte de revisión, §6.4).
 #
-# Reemplazar los valores de ejemplo por la versión exacta elegida antes de correr
-# cualquier experimento, y no cambiarlos entre condiciones B1/B3/B4/B5/B6.
+# No cambiar estos valores entre condiciones B1/B3/B4/B5/B6: el modelo base debe
+# ser idéntico en todas, para que cualquier diferencia de resultado se pueda
+# atribuir a la arquitectura de coordinación y no al modelo.
+#
+# Modelo elegido: Salamandra-7B-Instruct (BSC-LT), por ser un modelo abierto
+# entrenado específicamente en español y lenguas cooficiales (no multilingüe
+# genérico), lo que encaja mejor con un proyecto centrado en variedades del
+# español. Alternativas evaluadas: Qwen3-8B-Instruct, Meta-Llama-3.1-8B-Instruct
+# (también válidas, multilingües de propósito general).
 
 modelo:
-  nombre: "Qwen/Qwen3-8B-Instruct"   # ejemplo, fijar el repositorio/checkpoint exacto
-  revision: ""                        # commit o tag exacto del checkpoint, si aplica
+  nombre: "BSC-LT/salamandra-7b-instruct"
+  revision: ""                        # fijar el commit/tag exacto del checkpoint usado, antes de correr el experimento
   cuantizacion: "4-bit (bitsandbytes)"
   contexto_maximo_tokens: 8192
+
+# Importante: el modelo se usa preentrenado, tal como se publica. Este proyecto
+# no hace fine-tuning ni ajusta pesos en ningún punto, ni para el monoagente ni
+# para el multiagente. El corpus (TASS 2020) se usa solo para diseñar prompts
+# (desarrollo), fijar tau y max_iter (validación) y evaluar (prueba bloqueada),
+# nunca para entrenar. Ver README.md, sección "Solo inferencia, sin entrenamiento".
 
 decodificacion:
   temperatura_percepcion: 0.0   # determinista: solo extrae indicios, no debe variar
