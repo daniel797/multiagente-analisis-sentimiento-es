@@ -6,7 +6,7 @@ Repositorio de tesis de maestría — Universidad Nacional de Ingeniería (UNI),
 
 ---
 
-## De qué trata esto
+## 
 
 El proyecto compara, de forma experimental y controlada, un sistema **monoagente** (un LLM que clasifica el sentimiento de un tuit en una sola llamada) contra un sistema **multiagente** (el mismo LLM coordinando varios roles: percepción de fenómenos lingüísticos, razonamiento y resolución) sobre tuits en español de seis variedades dialectales: España, México, Perú, Chile, Costa Rica y Uruguay, usando el corpus multivariante de TASS 2020.
 
@@ -32,9 +32,7 @@ Este repositorio documenta el avance del proyecto semana a semana. El estado act
 .
 ├── agents/             # Esqueleto de los agentes (percepción, razonamiento, resolución, coordinador)
 ├── configs/             # Configuración del modelo base y de los experimentos (versión exacta, semillas, etc.)
-├── data/
-│   ├── raw/              # Archivos originales de TASS 2020, tal como se reciben (NO se sube a git, ver abajo)
-│   └── processed/        # Corpus ya consolidado y particionado (dev / val / test)
+├── data/               # Archivos originales de TASS 2020, tal como se reciben
 ├── docs/                # Avances entregados (PDFs de cada semana)
 ├── notebooks/           # Exploración del corpus, auditoría de fenómenos, prototipos rápidos
 ├── scripts/
