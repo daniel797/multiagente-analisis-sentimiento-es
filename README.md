@@ -54,7 +54,7 @@ El corpus **InterTASS / TASS 2020 multivariante** no es de descarga directa ni d
 
 Para reproducir el proyecto:
 
-1. Registrarse y descargar el corpus en tass.sepln.org (ediciones ES, MX, PE, CL, CR, UY de TASS 2020).
+1. Registrarse y descargar el corpus en tass.sepln.org (ediciones ES, MX, PE, CR, UY de TASS 2020).
 2. Colocar los archivos originales, sin modificar, en `data/`
 3. Correr `scripts/data/consolidate_dataset.py` para unificarlos en un único archivo tabular.
 4. Correr `scripts/data/split_dataset.py` para generar las particiones de desarrollo, validación y prueba bloqueada.
