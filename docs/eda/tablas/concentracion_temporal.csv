@@ -1,0 +1,6 @@
+variedad,semanas_con_tuits,semana_pico,tuits_semana_pico,pct_en_semana_pico,pct_en_2_semanas_top,mediana_fecha_train,mediana_fecha_dev,dias_dev_despues_de_train,ks_D_train_vs_dev
+CR,26,2016-11-21,132,11.3,20.3,2016-11-16,2016-12-29,42,0.604
+ES,24,2016-08-29,903,52.9,87.1,2016-08-29,2016-08-30,0,0.171
+MX,26,2017-01-09,619,41.3,79.7,2017-01-05,2017-01-11,5,0.585
+PE,26,2016-12-19,230,15.7,30.9,2016-12-14,2017-01-03,19,0.603
+UY,26,2016-11-28,117,8.2,15.3,2016-10-31,2016-12-18,47,0.597

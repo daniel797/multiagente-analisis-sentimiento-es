@@ -1,0 +1,9 @@
+chequeo,casos
+Filas totales,7267
+Textos vacíos,0
+Ids repetidos (filas extra),2
+Textos repetidos tras normalizar (filas extra),16
+Textos repetidos con etiquetas distintas (textos),2
+Ids presentes en train y dev a la vez,1
+Textos presentes en train y dev a la vez,3
+Tuits con URL,45

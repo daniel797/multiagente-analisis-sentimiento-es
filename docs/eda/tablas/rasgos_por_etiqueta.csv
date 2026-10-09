@@ -1,0 +1,4 @@
+etiqueta,URL,@mención,#hashtag,emoji,emoticón :),letras alargadas,¡exclamación!,¿pregunta?,MAYÚSCULAS
+NEG,0.2,39.2,5.4,0.1,0.1,4.4,8.2,7.9,0.1
+NEU,0.7,53.9,6.8,0.2,0.1,4.6,12.8,9.9,0.2
+POS,1.0,58.7,10.4,0.4,0.0,5.7,26.3,4.8,0.4

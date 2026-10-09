@@ -6,9 +6,9 @@ Repositorio de tesis de maestría — Universidad Nacional de Ingeniería (UNI),
 
 ---
 
-## 
+## De qué trata esto
 
-El proyecto compara, de forma experimental y controlada, un sistema **monoagente** (un LLM que clasifica el sentimiento de un tuit en una sola llamada) contra un sistema **multiagente** (el mismo LLM coordinando varios roles: percepción de fenómenos lingüísticos, razonamiento y resolución) sobre tuits en español de seis variedades dialectales: España, México, Perú, Chile, Costa Rica y Uruguay, usando el corpus multivariante de TASS 2020.
+El proyecto compara, de forma experimental y controlada, un sistema **monoagente** (un LLM que clasifica el sentimiento de un tuit en una sola llamada) contra un sistema **multiagente** (el mismo LLM coordinando varios roles: percepción de fenómenos lingüísticos, razonamiento y resolución) sobre tuits en español de cinco variedades dialectales: España, México, Perú, Costa Rica y Uruguay, usando el corpus multivariante de TASS 2020.
 
 No se entrena ni se ajusta ningún modelo. El LLM base se usa preentrenado tal cual; lo que se diseña y evalúa es cómo se coordinan las llamadas que se le hacen.
 
@@ -32,11 +32,16 @@ Este repositorio documenta el avance del proyecto semana a semana. El estado act
 .
 ├── agents/             # Esqueleto de los agentes (percepción, razonamiento, resolución, coordinador)
 ├── configs/             # Configuración del modelo base y de los experimentos (versión exacta, semillas, etc.)
-├── data/               # Archivos originales de TASS 2020, tal como se reciben
-├── docs/                # Avances entregados (PDFs de cada semana)
-├── notebooks/           # Exploración del corpus, auditoría de fenómenos, prototipos rápidos
+├── data/
+│   ├── train/            # Un TSV por variedad (cr, es, mx, pe, uy), sin encabezado: id, texto, etiqueta
+│   └── dev/              # Ídem, partición de desarrollo
+├── docs/
+│   ├── eda/              # Resultados del EDA: RESUMEN_EDA.md, tablas/ (CSV) y figuras/ (PNG)
+│   └── *.pdf             # Avances entregados (PDFs de cada semana)
+├── notebooks/           # 01 exploración inicial · 02 EDA con los datos reales
 ├── scripts/
 │   ├── data/             # Consolidación, partición y auditoría del dataset
+│   ├── eda/              # Análisis exploratorio (tablas y figuras)
 │   └── utils/            # Funciones compartidas (lectura/escritura, logging)
 ├── tests/               # Pruebas de los scripts de datos
 ├── requirements.txt
@@ -62,9 +67,26 @@ Para reproducir el proyecto:
 | `scripts/data/consolidate_dataset.py` | Lee los archivos crudos por variedad dialectal (XML/TSV/CSV, según venga de TASS) y los consolida en un único CSV con columnas `id, texto, variedad, etiqueta`. |
 | `scripts/data/split_dataset.py` | Genera una partición estratificada por variedad y etiqueta en `dev` / `val` / `test`, dejando el test bloqueado (no se vuelve a tocar hasta la evaluación final). |
 | `scripts/data/audit_phenomena.py` | Corre heurísticas simples (no un modelo) para contar menciones aproximadas de diminutivos afectivos, doble negación, code-switching y marcadores de sarcasmo/ironía, y deja un reporte por variedad. Sirve para decidir si hay evidencia suficiente en el corpus antes de comprometer hipótesis por fenómeno. |
+| `scripts/eda/run_eda.py` | Genera el EDA completo: 14 tablas CSV en `docs/eda/tablas/` y 7 figuras en `docs/eda/figuras/` a partir de `data/train` y `data/dev`. |
+| `scripts/eda/eda_utils.py` | Funciones del EDA (calidad de datos, etiquetas, rasgos del texto, fenómenos, vocabulario, fechas, línea base mayoritaria). Las usan el script y el notebook. |
 | `scripts/utils/io_utils.py` | Funciones compartidas de lectura/escritura y logging usadas por los scripts anteriores. |
 
 Ninguno de estos scripts entrena un modelo: preparan los datos. La implementación de los agentes (`agents/`) queda como siguiente etapa, una vez cerrada la auditoría del corpus.
+
+## Análisis exploratorio (EDA)
+
+El EDA corre sobre los datos reales de `data/train` y `data/dev` (7.267 tuits). Resumen completo en [`docs/eda/RESUMEN_EDA.md`](docs/eda/RESUMEN_EDA.md) y notebook en `notebooks/02_eda.ipynb`. Lo más relevante:
+
+- Hay **cinco variedades** (CR, ES, MX, PE, UY).
+- **Perú es la única variedad con NEU como clase mayoritaria** (54-57%). En las demás domina NEG.
+- Predecir siempre la clase mayoritaria da un **Macro-F1 de 0,18 a 0,24** en *dev*: es el piso a superar.
+- Los tuits son cortos (máx. 146 caracteres) y casi no tienen emojis.
+- El **code-switching es muy escaso** (64 tuits en total) y el script de auditoría llama "sarcasmo" a lo que en realidad son risas.
+- En ES y MX más del 80% de los tuits está concentrado en dos semanas, así que época, tema y dialecto se confunden.
+
+```bash
+python scripts/eda/run_eda.py        # regenera docs/eda/tablas y docs/eda/figuras
+```
 
 ## Modelo base
 
@@ -80,12 +102,16 @@ pip install -r requirements.txt
 python scripts/data/consolidate_dataset.py --raw-dir data/raw --out data/processed/tass2020_consolidado.csv
 python scripts/data/split_dataset.py --input data/processed/tass2020_consolidado.csv --out-dir data/processed
 python scripts/data/audit_phenomena.py --input data/processed/dev.csv --out data/processed/auditoria_fenomenos.csv
+
+# EDA sobre data/train y data/dev
+python scripts/eda/run_eda.py
 ```
 
 ## Estado del proyecto
 
 - [x] Semana 2 — Diseño del flujo reproducible (`docs/Avance_Semana2_Julio_Pozo.pdf`)
 - [x] Scripts de consolidación, partición y auditoría del corpus
+- [x] EDA del corpus por variedad (`docs/eda/`, `notebooks/02_eda.ipynb`)
 - [ ] Implementación de los agentes (Percepción, Razonamiento, Resolución, Coordinador)
 - [ ] Ejecución de las condiciones experimentales (B1, B3, B4, B5, B6)
 - [ ] Evaluación y análisis estadístico
