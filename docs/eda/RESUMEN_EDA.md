@@ -4,7 +4,7 @@ Resumen de lo que muestran los datos de `data/train` y `data/dev` antes de dise�
 
 ## Qué hay en los datos
 
-Son **7.267 tuits de cinco variedades**: Costa Rica, España, México, Perú y Uruguay. Cada país aporta entre 1.167 y 1.707 tuits, repartidos en *train* (4.802) y *dev* (2.465). Dos cosas no coinciden con el plan original: **no hay Chile** (el plan habla de seis variedades) y **no existe una partición de prueba**. Las etiquetas son tres (POS, NEG, NEU) y están completas.
+Son **7.267 tuits de cinco variedades**: Costa Rica, España, México, Perú y Uruguay. Cada país aporta entre 1.167 y 1.707 tuits, repartidos en *train* (4.802) y *dev* (2.465). Dos cosas no coinciden con el plan original: Las etiquetas son tres (POS, NEG, NEU) y están completas.
 
 Los tuits son cortos: mediana de 92 caracteres y máximo de 146 (unas 16 palabras). Casi no tienen emojis (0 a 0,5%), pero entre el 40% y el 63% lleva una @mención, así que el texto es muy conversacional (`fig03`, `fig04`).
 
@@ -39,10 +39,9 @@ La consecuencia es que **las diferencias de desempeño entre países se confunde
 
 ## Qué implica para el proyecto
 
-1. **Chile.** Conseguir ese subcorpus, o ajustar a "cinco variedades" el título, el README y el documento de avance.
-2. **Conjunto de prueba.** Decidir si el *dev* oficial hace de prueba bloqueada (conserva el orden temporal en CR, PE y UY) o si se reparte todo de nuevo. Es una decisión metodológica que conviene fijar antes de diseñar los prompts.
-3. **Robustez.** Quitar "emojis equivalentes" de las perturbaciones: no hay emojis donde aplicarlos. Quedan tildes, tipeo, mayúsculas, letras alargadas y abreviaturas.
-4. **Fenómenos.** Renombrar el "sarcasmo aparente" del script de auditoría y planificar una anotación manual. El code-switching no alcanza para analizarlo por país.
-5. **Lectura por país.** Reportar junto a cada resultado la concentración temporal y el posible efecto de anotación de NEU en Perú, y no atribuir diferencias al dialecto sin ese control.
-6. **Potencia estadística.** Con ~400 a 580 tuits de *dev* por país, el margen de error máximo de una Accuracy es de ±4 a ±5 puntos. Una mejora de 0,02 en Macro-F1 cae dentro de ese margen en cada país por separado, así que serán imprescindibles las pruebas pareadas y el análisis conjunto.
-7. **Configuración.** Con tuits de 146 caracteres como máximo, `contexto_maximo_tokens: 8192` está muy sobredimensionado: el costo lo marcarán el prompt y el número de muestras, no el tuit.
+1. **Conjunto de prueba.** Decidir si el *dev* oficial hace de prueba bloqueada (conserva el orden temporal en CR, PE y UY) o si se reparte todo de nuevo. Es una decisión metodológica que conviene fijar antes de diseñar los prompts.
+2. **Robustez.** Quitar "emojis equivalentes" de las perturbaciones: no hay emojis donde aplicarlos. Quedan tildes, tipeo, mayúsculas, letras alargadas y abreviaturas.
+3. **Fenómenos.** Renombrar el "sarcasmo aparente" del script de auditoría y planificar una anotación manual. El code-switching no alcanza para analizarlo por país.
+4. **Lectura por país.** Reportar junto a cada resultado la concentración temporal y el posible efecto de anotación de NEU en Perú, y no atribuir diferencias al dialecto sin ese control.
+5. **Potencia estadística.** Con ~400 a 580 tuits de *dev* por país, el margen de error máximo de una Accuracy es de ±4 a ±5 puntos. Una mejora de 0,02 en Macro-F1 cae dentro de ese margen en cada país por separado, así que serán imprescindibles las pruebas pareadas y el análisis conjunto.
+6. **Configuración.** Con tuits de 146 caracteres como máximo, `contexto_maximo_tokens: 8192` está muy sobredimensionado: el costo lo marcarán el prompt y el número de muestras, no el tuit.
