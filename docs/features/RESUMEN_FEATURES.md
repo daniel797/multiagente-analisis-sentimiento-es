@@ -52,14 +52,38 @@ Regresión logística entrenada con *train* y medida en *dev* (2.465 tuits), con
 | TF-IDF palabras + caracteres | 0,57 (0,55 a 0,59) |
 | TF-IDF palabras + todas las numéricas | 0,56 (0,54 a 0,58) |
 
-Combinar las características hechas a mano con las palabras **no mejora** sobre TF-IDF: los intervalos se solapan. Por país, Perú queda más abajo en casi todos los modelos (0,44 a 0,52), en línea con su exceso de neutrales visto en el EDA.
+Combinar las características hechas a mano con las palabras **no mejora** sobre TF-IDF (ver la prueba pareada en la sección 7). Por país, Perú queda más abajo en casi todos los modelos (0,44 a 0,52), en línea con su exceso de neutrales visto en el EDA.
 
 En `terminos_por_clase.csv`, las palabras de NEG (*triste, feo, peor, odio*) y POS (*feliz, gracias, amo, bonito*) son afectivas. En NEU aparecen palabras conversacionales (*hola, creo, igual, normal*) y `usuario`, que viene de las menciones normalizadas.
+
+## 7. ¿Las diferencias entre representaciones son reales? (`diferencias_pareadas.csv`)
+
+Se usa un *bootstrap* pareado sobre la diferencia de Macro-F1, porque los modelos se miden sobre los mismos tuits. Comparar si dos intervalos separados se solapan no basta.
+
+- **TF-IDF de palabras supera a las 24 características** por 0,047 (IC 0,025 a 0,068).
+- **No se distingue** entre TF-IDF de palabras y de caracteres (0,012, IC −0,006 a 0,032), ni con su combinación (0,010), ni agregando las características numéricas a las palabras (0,002).
+
+## 8. ¿Qué aporta cada grupo? (`ablacion_por_grupo.csv`, `importancia_permutacion.csv`, `fig05`, `fig06`)
+
+- Quitar el **léxico** baja el Macro-F1 en 0,075 (IC −0,096 a −0,054), y es el único grupo cuya ausencia se nota. Quitar cualquier otro grupo no cambia nada distinguible.
+- Solo con las **3 características de léxico** se llega a 0,48, contra 0,51 con las 24. Los otros grupos, cada uno solo, quedan entre 0,33 y 0,39.
+- En la importancia por permutación dominan `n_lex_positivo` (caída de 0,080) y `n_lex_negativo` (0,026), seguidos de `n_negaciones` (0,013), `n_intensificadores` y `n_exclamaciones` (0,009). Emojis, emoticonos, enlaces y oraciones no aportan.
+
+## 9. Estabilidad frente a las perturbaciones (`estabilidad_features.csv`, `robustez_modelos.csv`, `fig07`, `fig08`)
+
+Se aplican las perturbaciones previstas para la prueba de robustez (sin tildes, mayúsculas, minúsculas, letras alargadas, tipeo y abreviaturas). Los modelos se entrenan con texto limpio.
+
+- Las características de **mayúsculas** son las más frágiles: cambian en el 100% de los tuits al poner todo en mayúsculas, y el modelo de 24 características cae **0,084**. TF-IDF no cambia.
+- Las **letras alargadas** bajan 0,026 a TF-IDF de palabras y 0,028 al modelo numérico, y casi no afectan a TF-IDF de caracteres (−0,005).
+- El **tipeo** baja todos los modelos entre 0,014 y 0,020. Las **abreviaturas** y las **tildes** casi no los afectan.
+- Para el experimento: un LLM no es invariante a mayúsculas como TF-IDF, así que conviene medir su caída en mayúsculas y letras alargadas, las perturbaciones más informativas.
 
 ## Decisiones
 
 1. **Prompt:** normalización mínima, sin tocar mayúsculas, puntuación ni emojis, y sin pasar la variedad.
-2. **Pisos:** comparar el LLM contra la clase mayoritaria (0,19) y contra TF-IDF (0,56 a 0,57). Si el monoagente queda por debajo de TF-IDF, reportarlo.
+2. **Pisos:** comparar el LLM contra la clase mayoritaria (0,19) y contra TF-IDF (0,56 a 0,57). Entre las variantes de TF-IDF no hay diferencias distinguibles. Si el monoagente queda por debajo de TF-IDF, reportarlo.
 3. **Percepción:** medir si el agente aporta algo sobre las banderas heurísticas, que como reglas aisladas dicen poco.
 4. **Atajos:** reportar los resultados por país junto con el contexto temporal, y usar con cuidado las características conversacionales.
-5. **Pendientes:** validar a mano las reglas (muestra de `docs/eda/tablas/muestra_validar_heuristicas.csv`) y, si se quiere un léxico de referencia, sustituir el léxico mínimo por uno validado.
+5. **Robustez:** medir la caída del monoagente y del multiagente bajo mayúsculas y letras alargadas, y compararla con estos números de referencia.
+6. **Catálogo:** conservar léxico, negación, exclamaciones e intensificadores, quitar una característica de cada par redundante y descartar las que no aportan.
+7. **Pendientes:** validar a mano las reglas (muestra de `docs/eda/tablas/muestra_validar_heuristicas.csv`) y sustituir el léxico mínimo por uno validado, que sería la mejora más rentable.

@@ -1,0 +1,12 @@
+configuracion,n_features,macro_f1_dev,cambio_vs_completo,ic_inf,ic_sup
+Completo (5 grupos),24,0.5085,0.0,0.0,0.0
+Sin estructural,18,0.5067,-0.0017,-0.0099,0.0068
+Sin expresividad,17,0.5174,0.0089,-0.0019,0.0201
+Sin conversacional,20,0.5168,0.0083,-0.0054,0.0232
+Sin fenomeno,20,0.5113,0.0028,-0.008,0.0136
+Sin lexico,21,0.4331,-0.0754,-0.0962,-0.0537
+Solo estructural,6,0.3927,-0.1158,-0.1398,-0.0912
+Solo expresividad,7,0.3542,-0.1543,-0.1783,-0.1285
+Solo conversacional,4,0.372,-0.1365,-0.1591,-0.1133
+Solo fenomeno,4,0.3318,-0.1767,-0.2005,-0.1543
+Solo lexico,3,0.4757,-0.0328,-0.0507,-0.0135

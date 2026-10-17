@@ -1,0 +1,31 @@
+perturbacion,representacion,macro_f1_limpio,macro_f1_perturbado,caida
+sin_tildes,Superficie + fenómenos + léxico (24 numéricas),0.5085,0.5085,0.0
+sin_tildes,TF-IDF de palabras,0.5556,0.5487,-0.0069
+sin_tildes,TF-IDF de caracteres,0.5678,0.5585,-0.0093
+sin_tildes,TF-IDF palabras + caracteres,0.566,0.5588,-0.0072
+sin_tildes,TF-IDF palabras + numéricas,0.5576,0.547,-0.0106
+mayusculas,Superficie + fenómenos + léxico (24 numéricas),0.5085,0.4243,-0.0842
+mayusculas,TF-IDF de palabras,0.5556,0.5557,0.0
+mayusculas,TF-IDF de caracteres,0.5678,0.5679,0.0001
+mayusculas,TF-IDF palabras + caracteres,0.566,0.5665,0.0005
+mayusculas,TF-IDF palabras + numéricas,0.5576,0.5103,-0.0473
+minusculas,Superficie + fenómenos + léxico (24 numéricas),0.5085,0.5134,0.0049
+minusculas,TF-IDF de palabras,0.5556,0.5556,0.0
+minusculas,TF-IDF de caracteres,0.5678,0.5678,0.0
+minusculas,TF-IDF palabras + caracteres,0.566,0.566,0.0
+minusculas,TF-IDF palabras + numéricas,0.5576,0.5581,0.0005
+alargar_letras,Superficie + fenómenos + léxico (24 numéricas),0.5085,0.4806,-0.0279
+alargar_letras,TF-IDF de palabras,0.5556,0.5295,-0.0261
+alargar_letras,TF-IDF de caracteres,0.5678,0.5624,-0.0054
+alargar_letras,TF-IDF palabras + caracteres,0.566,0.5607,-0.0053
+alargar_letras,TF-IDF palabras + numéricas,0.5576,0.5122,-0.0454
+tipeo,Superficie + fenómenos + léxico (24 numéricas),0.5085,0.4945,-0.014
+tipeo,TF-IDF de palabras,0.5556,0.5395,-0.0161
+tipeo,TF-IDF de caracteres,0.5678,0.5537,-0.0141
+tipeo,TF-IDF palabras + caracteres,0.566,0.5522,-0.0138
+tipeo,TF-IDF palabras + numéricas,0.5576,0.538,-0.0196
+abreviaturas,Superficie + fenómenos + léxico (24 numéricas),0.5085,0.5095,0.0011
+abreviaturas,TF-IDF de palabras,0.5556,0.5449,-0.0107
+abreviaturas,TF-IDF de caracteres,0.5678,0.5664,-0.0014
+abreviaturas,TF-IDF palabras + caracteres,0.566,0.5611,-0.0049
+abreviaturas,TF-IDF palabras + numéricas,0.5576,0.5501,-0.0075

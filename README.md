@@ -74,7 +74,7 @@ Para reproducir el proyecto:
 | `scripts/eda/eda_extra.py` | Segunda etapa del EDA: intervalos de confianza, época vs. país, línea base TF-IDF (solo como referencia), potencia estadística y textos casi duplicados. |
 | `scripts/eda/validar_heuristicas.py` | Calcula la precisión de las reglas de fenómenos a partir de la muestra anotada a mano (`docs/eda/tablas/muestra_validar_heuristicas.csv`). |
 | `scripts/features/feature_utils.py` | Feature Engineering: catálogo de 24 características lingüísticas y de superficie, normalización del texto para el prompt, banderas de Percepción y modelos de referencia (TF-IDF). |
-| `scripts/features/run_features.py` | Genera el análisis de Feature Engineering: 10 tablas CSV en `docs/features/tablas/` y 4 figuras en `docs/features/figuras/`. |
+| `scripts/features/run_features.py` | Genera el análisis de Feature Engineering: 16 tablas CSV en `docs/features/tablas/` y 8 figuras en `docs/features/figuras/`. |
 | `scripts/utils/io_utils.py` | Funciones compartidas de lectura/escritura y logging usadas por los scripts anteriores. |
 
 Ninguno de estos scripts entrena un modelo: preparan los datos. La implementación de los agentes (`agents/`) queda como siguiente etapa, una vez cerrada la auditoría del corpus.
@@ -106,7 +106,9 @@ El proyecto no entrena ningún modelo, pero sí tiene ingeniería de caracterís
 - La señal que más distingue las etiquetas viene del **léxico**, la **negación** y las **exclamaciones**. La longitud, los emojis y el code-switching casi no aportan.
 - Las banderas del agente de Percepción, como reglas aisladas, dicen poco (salvo la doble negación). Su valor tendría que estar en interpretarlas en contexto.
 - Las características conversacionales (menciones, hashtags, enlaces) se ligan más al país que al sentimiento, y el texto por sí solo delata parcialmente el país (Macro-F1 de 0,38 frente a 0,20 al azar).
-- **Pisos de referencia en *dev*:** clase mayoritaria 0,19 y TF-IDF 0,56 a 0,57 de Macro-F1. Los modelos de referencia se ajustan solo con *train* y no forman parte del experimento.
+- **Qué aporta cada grupo:** el léxico es lo único indispensable. Con 3 características de léxico se llega a 0,48 de Macro-F1, frente a 0,51 con las 24.
+- **Robustez:** las características de mayúsculas son frágiles (el modelo numérico cae 0,084 al poner todo en mayúsculas), y TF-IDF no cambia. Sirve de referencia para la prueba de robustez del LLM.
+- **Pisos de referencia en *dev*:** clase mayoritaria 0,19 y TF-IDF 0,56 a 0,57 de Macro-F1, sin diferencias distinguibles entre las variantes de TF-IDF (prueba pareada). Los modelos de referencia se ajustan solo con *train* y no forman parte del experimento.
 
 ```bash
 python scripts/features/run_features.py      # regenera docs/features/tablas y docs/features/figuras

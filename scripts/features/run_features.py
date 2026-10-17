@@ -101,6 +101,77 @@ def fig_correlaciones(matriz: pd.DataFrame, ruta: Path) -> None:
     R._guardar(fig, ruta)
 
 
+def fig_ablacion(ab: pd.DataFrame, ruta: Path) -> None:
+    t = ab.iloc[1:].copy()
+    t["tipo"] = t["configuracion"].str.split().str[0]
+    fig, axs = plt.subplots(1, 2, figsize=(11, 4.2), sharex=True)
+    for ax, tipo, titulo in ((axs[0], "Sin", "Quitar un grupo del modelo completo"), (axs[1], "Solo", "Usar un grupo solo")):
+        d = t[t.tipo == tipo].iloc[::-1]
+        y = np.arange(len(d))
+        cols = ["#e34948" if hi < 0 else "#b8b7b0" for hi in d["ic_sup"]]
+        ax.barh(y, d["cambio_vs_completo"], color=cols, height=0.6)
+        ax.errorbar(d["cambio_vs_completo"], y, xerr=[d["cambio_vs_completo"] - d["ic_inf"], d["ic_sup"] - d["cambio_vs_completo"]], fmt="none", ecolor=R.INK2, capsize=3)
+        ax.set_yticks(y, d["configuracion"].str.replace("Sin ", "").str.replace("Solo ", ""))
+        ax.axvline(0, color=R.INK2, lw=0.8)
+        ax.set_title(titulo)
+        ax.set_xlabel("Cambio en Macro-F1 vs. modelo completo (IC 95%)")
+        ax.xaxis.grid(True, color=R.GRID)
+        ax.set_axisbelow(True)
+    fig.suptitle("Ablación por grupo (rojo = caída distinguible de cero, gris = no se distingue)", x=0.01, ha="left", fontsize=11, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    R._guardar(fig, ruta)
+
+
+def fig_importancia(imp: pd.DataFrame, ruta: Path) -> None:
+    d = imp.head(12).iloc[::-1]
+    fig, ax = plt.subplots(figsize=(8, 4.6))
+    ax.barh(d["feature"], d["caida_macro_f1"], xerr=d["desv"], color=[COLOR_GRUPO[g] for g in d["grupo"]], ecolor=R.INK2, capsize=2, height=0.62)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in COLOR_GRUPO.values()]
+    ax.legend(handles, COLOR_GRUPO.keys(), loc="lower right")
+    ax.set_xlabel("Caída del Macro-F1 al desordenar la característica (dev, media y desv. de 15 repeticiones)")
+    ax.xaxis.grid(True, color=R.GRID)
+    ax.set_axisbelow(True)
+    ax.set_title("Importancia por permutación (modelo de 24 características)")
+    R._guardar(fig, ruta)
+
+
+def fig_estabilidad(est: pd.DataFrame, ruta: Path) -> None:
+    t = est.set_index("feature")
+    fig, ax = plt.subplots(figsize=(7.4, 7.2))
+    im = ax.imshow(t.values, cmap=R.SEQ, vmin=0, vmax=100, aspect="auto")
+    ax.set_xticks(range(t.shape[1]), t.columns, rotation=30, ha="right")
+    ax.set_yticks(range(t.shape[0]), t.index, fontsize=8.5)
+    for i in range(t.shape[0]):
+        for j in range(t.shape[1]):
+            v = t.values[i, j]
+            if v >= 0.5:
+                ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=8, color="white" if v > 55 else R.INK)
+    ax.spines[:].set_visible(False)
+    ax.tick_params(length=0)
+    fig.colorbar(im, ax=ax, shrink=0.7, label="% de tuits del dev donde cambia el valor")
+    ax.set_title("Estabilidad de cada característica frente a las perturbaciones")
+    R._guardar(fig, ruta)
+
+
+def fig_robustez(rob: pd.DataFrame, ruta: Path) -> None:
+    t = rob.pivot(index="perturbacion", columns="representacion", values="caida")
+    fig, ax = plt.subplots(figsize=(9.2, 4))
+    lim = float(np.abs(t.values).max())
+    im = ax.imshow(t.values, cmap="RdBu", vmin=-lim, vmax=lim, aspect="auto")
+    etiquetas = {"Superficie + fenómenos + léxico (24 numéricas)": "24 numéricas", "TF-IDF de caracteres": "TF-IDF\ncaracteres", "TF-IDF de palabras": "TF-IDF\npalabras",
+                 "TF-IDF palabras + caracteres": "TF-IDF\npal. + car.", "TF-IDF palabras + numéricas": "TF-IDF\npal. + num."}
+    ax.set_xticks(range(t.shape[1]), [etiquetas.get(c, c) for c in t.columns], fontsize=9)
+    ax.set_yticks(range(t.shape[0]), t.index)
+    for i in range(t.shape[0]):
+        for j in range(t.shape[1]):
+            ax.text(j, i, f"{t.values[i, j]:+.3f}", ha="center", va="center", fontsize=9, color=R.INK)
+    ax.spines[:].set_visible(False)
+    ax.tick_params(length=0)
+    fig.colorbar(im, ax=ax, shrink=0.8, label="Cambio en Macro-F1")
+    ax.set_title("Qué tanto cae el Macro-F1 al perturbar el texto (modelos entrenados con texto limpio)")
+    R._guardar(fig, ruta)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--data-dir", default="data")
@@ -115,6 +186,13 @@ def main() -> None:
     print(f"Corpus: {len(corpus)} tuits · {M.shape[1]} características")
 
     resumen, por_var = F.comparar_representaciones(corpus)
+    rep = F.Representaciones(corpus)
+    y_dev = rep.dev["etiqueta"].values
+    dif = F.diferencias_pareadas(y_dev, rep.predecir(), [("pal", "car"), ("pal", "pal+car"), ("pal", "pal+num"), ("car", "pal+car"), ("num", "pal"), ("num", "pal+num")])
+    abl = F.ablacion_por_grupo(corpus)
+    imp = F.importancia_permutacion(corpus)
+    est = F.estabilidad_features(corpus)
+    rob = F.robustez_modelos(corpus)
     aso = F.asociacion_univariada(M, corpus["etiqueta"], corpus["variedad"])
     salidas = {
         "catalogo_features": F.catalogo_features(),
@@ -127,6 +205,12 @@ def main() -> None:
         "terminos_por_clase": F.terminos_por_clase(corpus),
         "prediccion_de_variedad": F.prediccion_de_variedad(corpus),
         "perfil_pistas": F.perfil_pistas(corpus, M),
+        "diferencias_pareadas": dif,
+        "ablacion_por_grupo": abl,
+        "importancia_permutacion": imp,
+        "estabilidad_features": est,
+        "robustez_modelos": rob,
+        "mapa_features_agentes": F.mapa_features_agentes(),
     }
     print("Tablas:")
     for nombre, t in salidas.items():
@@ -138,6 +222,10 @@ def main() -> None:
     fig_efecto(aso, figs / "fig02_efecto_etiqueta_vs_variedad.png")
     fig_por_variedad(por_var, figs / "fig03_macro_f1_por_variedad.png")
     fig_correlaciones(M, figs / "fig04_correlaciones.png")
+    fig_ablacion(abl, figs / "fig05_ablacion_por_grupo.png")
+    fig_importancia(imp, figs / "fig06_importancia_permutacion.png")
+    fig_estabilidad(est, figs / "fig07_estabilidad_features.png")
+    fig_robustez(rob, figs / "fig08_robustez_modelos.png")
     print("Listo.")
 
 

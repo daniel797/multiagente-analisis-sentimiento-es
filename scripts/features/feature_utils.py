@@ -373,3 +373,222 @@ def prediccion_de_variedad(corpus: pd.DataFrame, n_boot: int = 300) -> pd.DataFr
             "macro_f1_ic_inf": round(float(np.percentile(vals, 2.5)), 4), "macro_f1_ic_sup": round(float(np.percentile(vals, 97.5)), 4),
         })
     return pd.DataFrame(out)
+
+
+# ----------------------------------------------------------------------------
+# Segunda etapa: comparaciones pareadas, ablación, importancia y estabilidad
+# ----------------------------------------------------------------------------
+GRUPOS_NUM = ["estructural", "expresividad", "conversacional", "fenomeno", "lexico"]
+
+
+def _macro_f1(y, pred) -> float:
+    return float(f1_score(y, pred, labels=ETIQUETAS, average="macro", zero_division=0))
+
+
+_COD = {e: i for i, e in enumerate(ETIQUETAS)}
+
+
+def _codificar(y) -> np.ndarray:
+    return np.array([_COD[v] for v in y])
+
+
+def _macro_f1_rapido(y: np.ndarray, p: np.ndarray) -> float:
+    """Macro-F1 sobre etiquetas ya codificadas como 0, 1, 2. Mucho más rápido que sklearn dentro del bootstrap."""
+    k = len(ETIQUETAS)
+    cm = np.bincount(y * k + p, minlength=k * k).reshape(k, k)
+    tp = np.diag(cm).astype(float)
+    prec = np.divide(tp, cm.sum(axis=0), out=np.zeros(k), where=cm.sum(axis=0) > 0)
+    rec = np.divide(tp, cm.sum(axis=1), out=np.zeros(k), where=cm.sum(axis=1) > 0)
+    f1 = np.divide(2 * prec * rec, prec + rec, out=np.zeros(k), where=(prec + rec) > 0)
+    return float(f1.mean())
+
+
+class Representaciones:
+    """
+    Ajusta, SOLO con train, todas las representaciones y deja predecir sobre cualquier texto.
+    Sirve para comparar modelos de forma pareada (mismos tuits) y para probar perturbaciones.
+    """
+
+    def __init__(self, corpus: pd.DataFrame):
+        c = corpus.reset_index(drop=True)
+        self.train = c[c.split == "train"]
+        self.dev = c[c.split == "dev"]
+        txt = self.train["texto"].map(normalizar_para_llm)
+        Mtr = construir_matriz(self.train)
+        self.vec_p = _tfidf_palabras().fit(txt)
+        self.vec_c = _tfidf_caracteres().fit(txt)
+        self.sc = StandardScaler().fit(Mtr[_numericas(GRUPOS_NUM)])
+        self.y_tr = self.train["etiqueta"]
+        self.modelos = {}
+        for nombre, mats in self._matrices(self.train["texto"]).items():
+            self.modelos[nombre] = _lr().fit(mats, self.y_tr)
+
+    NOMBRES = {
+        "num": "Superficie + fenómenos + léxico (24 numéricas)",
+        "pal": "TF-IDF de palabras",
+        "car": "TF-IDF de caracteres",
+        "pal+car": "TF-IDF palabras + caracteres",
+        "pal+num": "TF-IDF palabras + numéricas",
+    }
+
+    def _matrices(self, textos: pd.Series) -> dict:
+        t = textos.map(normalizar_para_llm)
+        Wp, Wc = self.vec_p.transform(t), self.vec_c.transform(t)
+        num = csr_matrix(self.sc.transform(construir_matriz(pd.DataFrame({"texto": textos}))[_numericas(GRUPOS_NUM)]))
+        return {"num": num, "pal": Wp, "car": Wc, "pal+car": hstack([Wp, Wc]).tocsr(), "pal+num": hstack([Wp, num]).tocsr()}
+
+    def predecir(self, textos: pd.Series | None = None) -> dict:
+        textos = self.dev["texto"] if textos is None else textos
+        mats = self._matrices(textos)
+        return {k: self.modelos[k].predict(mats[k]) for k in self.modelos}
+
+
+def diferencias_pareadas(y, preds: dict, pares: list[tuple[str, str]], n_boot: int = 2000, seed: int = 0) -> pd.DataFrame:
+    """
+    Diferencia de Macro-F1 entre dos representaciones medidas sobre LOS MISMOS tuits (bootstrap pareado).
+    Un IC que incluye 0 significa que no se puede afirmar que una sea mejor. Esto es más fiable que
+    comparar si dos intervalos separados se solapan.
+    """
+    rng = np.random.default_rng(seed)
+    y = _codificar(y)
+    idx = [rng.integers(0, len(y), len(y)) for _ in range(n_boot)]
+    filas = []
+    for a, b in pares:
+        pa, pb = _codificar(preds[a]), _codificar(preds[b])
+        obs = _macro_f1_rapido(y, pb) - _macro_f1_rapido(y, pa)
+        dif = np.array([_macro_f1_rapido(y[i], pb[i]) - _macro_f1_rapido(y[i], pa[i]) for i in idx])
+        p = float(min(1.0, 2 * min((dif <= 0).mean(), (dif >= 0).mean())))
+        lo, hi = np.percentile(dif, [2.5, 97.5])
+        filas.append({
+            "A": Representaciones.NOMBRES.get(a, a), "B": Representaciones.NOMBRES.get(b, b),
+            "dif_macro_f1_B_menos_A": obs, "ic_inf": float(lo), "ic_sup": float(hi), "p_bootstrap": p,
+            "conclusion": "B mejor" if lo > 0 else ("A mejor" if hi < 0 else "no se distingue"),
+        })
+    return pd.DataFrame(filas).round(4)
+
+
+def ablacion_por_grupo(corpus: pd.DataFrame, n_boot: int = 1000, seed: int = 0) -> pd.DataFrame:
+    """
+    Con las 24 características numéricas: Macro-F1 del modelo completo, quitando cada grupo y usando
+    cada grupo solo. Mide cuánto aporta cada grupo y si es reemplazable por los demás.
+    """
+    c = corpus.reset_index(drop=True)
+    tr, dv = c[c.split == "train"], c[c.split == "dev"]
+    Mtr, Mdv = construir_matriz(tr), construir_matriz(dv)
+    y_tr, y_dv = tr["etiqueta"], _codificar(dv["etiqueta"].values)
+
+    def predecir(cols):
+        sc = StandardScaler().fit(Mtr[cols])
+        return _codificar(_lr().fit(sc.transform(Mtr[cols]), y_tr).predict(sc.transform(Mdv[cols])))
+
+    todas = _numericas(GRUPOS_NUM)
+    completo = predecir(todas)
+    rng = np.random.default_rng(seed)
+    idx = [rng.integers(0, len(y_dv), len(y_dv)) for _ in range(n_boot)]
+    base = _macro_f1_rapido(y_dv, completo)
+    filas = [{"configuracion": "Completo (5 grupos)", "n_features": len(todas), "macro_f1_dev": base, "cambio_vs_completo": 0.0, "ic_inf": 0.0, "ic_sup": 0.0}]
+    for g in GRUPOS_NUM:
+        cols = _numericas([x for x in GRUPOS_NUM if x != g])
+        p = predecir(cols)
+        d = np.array([_macro_f1_rapido(y_dv[i], p[i]) - _macro_f1_rapido(y_dv[i], completo[i]) for i in idx])
+        filas.append({"configuracion": f"Sin {g}", "n_features": len(cols), "macro_f1_dev": _macro_f1_rapido(y_dv, p),
+                      "cambio_vs_completo": _macro_f1_rapido(y_dv, p) - base, "ic_inf": float(np.percentile(d, 2.5)), "ic_sup": float(np.percentile(d, 97.5))})
+    for g in GRUPOS_NUM:
+        cols = _numericas([g])
+        p = predecir(cols)
+        d = np.array([_macro_f1_rapido(y_dv[i], p[i]) - _macro_f1_rapido(y_dv[i], completo[i]) for i in idx])
+        filas.append({"configuracion": f"Solo {g}", "n_features": len(cols), "macro_f1_dev": _macro_f1_rapido(y_dv, p),
+                      "cambio_vs_completo": _macro_f1_rapido(y_dv, p) - base, "ic_inf": float(np.percentile(d, 2.5)), "ic_sup": float(np.percentile(d, 97.5))})
+    return pd.DataFrame(filas).round(4)
+
+
+def importancia_permutacion(corpus: pd.DataFrame, n_repeats: int = 15, seed: int = 0) -> pd.DataFrame:
+    """
+    Importancia por permutación en dev para el modelo de las 24 características: cuánto cae el Macro-F1
+    cuando se desordena una columna. Es más fiable que la asociación univariada porque considera a las demás.
+    """
+    from sklearn.inspection import permutation_importance
+
+    c = corpus.reset_index(drop=True)
+    tr, dv = c[c.split == "train"], c[c.split == "dev"]
+    cols = _numericas(GRUPOS_NUM)
+    Mtr, Mdv = construir_matriz(tr)[cols], construir_matriz(dv)[cols]
+    sc = StandardScaler().fit(Mtr)
+    m = _lr().fit(sc.transform(Mtr), tr["etiqueta"])
+    r = permutation_importance(m, sc.transform(Mdv), dv["etiqueta"], scoring="f1_macro", n_repeats=n_repeats, random_state=seed)
+    out = pd.DataFrame({"feature": cols, "caida_macro_f1": r.importances_mean, "desv": r.importances_std})
+    out["grupo"] = out["feature"].map({c_[0]: c_[1] for c_ in CATALOGO})
+    return out.sort_values("caida_macro_f1", ascending=False).reset_index(drop=True).round(4)
+
+
+# --- Perturbaciones (las mismas familias que la prueba de robustez del proyecto) ---
+def perturbar(texto: str, tipo: str, rng: np.random.Generator) -> str:
+    if tipo == "sin_tildes":
+        return _sin_acentos(texto)
+    if tipo == "mayusculas":
+        return texto.upper()
+    if tipo == "minusculas":
+        return texto.lower()
+    if tipo == "alargar_letras":
+        return re.sub(r"(\p{L}*?)([aeiouáéíóú])(\b)", lambda m: m.group(1) + m.group(2) * 3 + m.group(3) if rng.random() < 0.25 else m.group(0), texto)
+    if tipo == "tipeo":
+        def swap(m):
+            w = m.group(0)
+            if len(w) > 3 and rng.random() < 0.2:
+                i = int(rng.integers(1, len(w) - 2))
+                return w[:i] + w[i + 1] + w[i] + w[i + 2:]
+            return w
+        return re.sub(r"\p{L}+", swap, texto)
+    if tipo == "abreviaturas":
+        t = re.sub(r"\bque\b", "q", texto, flags=re.IGNORECASE)
+        t = re.sub(r"\bpor\b", "x", t, flags=re.IGNORECASE)
+        t = re.sub(r"\btambién\b|\btambien\b", "tb", t, flags=re.IGNORECASE)
+        return re.sub(r"\bde\b", "d", t, flags=re.IGNORECASE)
+    raise ValueError(tipo)
+
+
+PERTURBACIONES = ["sin_tildes", "mayusculas", "minusculas", "alargar_letras", "tipeo", "abreviaturas"]
+
+
+def estabilidad_features(corpus: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
+    """
+    Porcentaje de tuits del dev en los que cambia el valor de cada característica bajo cada perturbación.
+    Una característica estable cambia poco, una frágil mide el formato y no el contenido.
+    """
+    dv = corpus[corpus.split == "dev"]
+    base = construir_matriz(dv)
+    filas = {}
+    for tipo in PERTURBACIONES:
+        rng = np.random.default_rng(seed)
+        pert = construir_matriz(pd.DataFrame({"texto": dv["texto"].map(lambda t: perturbar(t, tipo, rng))}, index=dv.index))
+        filas[tipo] = ((pert - base).abs() > 1e-9).mean() * 100
+    return pd.DataFrame(filas).round(1).rename_axis("feature").reset_index()
+
+
+def robustez_modelos(corpus: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
+    """Macro-F1 en dev limpio y bajo cada perturbación, para cada representación (entrenadas con texto limpio)."""
+    R = Representaciones(corpus)
+    y = R.dev["etiqueta"].values
+    limpio = {k: _macro_f1(y, p) for k, p in R.predecir().items()}
+    filas = []
+    for tipo in PERTURBACIONES:
+        rng = np.random.default_rng(seed)
+        textos = R.dev["texto"].map(lambda t: perturbar(t, tipo, rng))
+        pred = R.predecir(textos)
+        for k, p in pred.items():
+            filas.append({"perturbacion": tipo, "representacion": Representaciones.NOMBRES[k],
+                          "macro_f1_limpio": limpio[k], "macro_f1_perturbado": _macro_f1(y, p),
+                          "caida": _macro_f1(y, p) - limpio[k]})
+    return pd.DataFrame(filas).round(4)
+
+
+def mapa_features_agentes() -> pd.DataFrame:
+    """Qué parte del sistema usa cada grupo de características y para qué."""
+    filas = [
+        ("Normalización del texto", "Pipeline (antes de todos los agentes)", "Prepara el prompt: anonimiza menciones y enlaces, conserva el tono, no pasa la variedad."),
+        ("Fenómeno (4)", "Agente de Percepción", "Las reglas son el piso con el que se compara lo que el agente detecte (diminutivo, doble negación, code-switching, risa)."),
+        ("Léxico (3)", "Línea base de referencia", "Mide cuánta señal da una lista corta. No entra al prompt de ningún agente."),
+        ("Estructural, expresividad, conversacional (17)", "Análisis y control", "Describen el corpus, permiten revisar atajos por país y alimentan los modelos de referencia."),
+        ("TF-IDF palabras y caracteres", "Línea base de referencia", "Piso que el monoagente y el multiagente deben superar. No forma parte del experimento."),
+    ]
+    return pd.DataFrame(filas, columns=["componente", "dónde se usa", "para qué"])

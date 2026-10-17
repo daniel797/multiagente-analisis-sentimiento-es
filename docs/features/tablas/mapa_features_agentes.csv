@@ -1,0 +1,6 @@
+componente,dónde se usa,para qué
+Normalización del texto,Pipeline (antes de todos los agentes),"Prepara el prompt: anonimiza menciones y enlaces, conserva el tono, no pasa la variedad."
+Fenómeno (4),Agente de Percepción,"Las reglas son el piso con el que se compara lo que el agente detecte (diminutivo, doble negación, code-switching, risa)."
+Léxico (3),Línea base de referencia,Mide cuánta señal da una lista corta. No entra al prompt de ningún agente.
+"Estructural, expresividad, conversacional (17)",Análisis y control,"Describen el corpus, permiten revisar atajos por país y alimentan los modelos de referencia."
+TF-IDF palabras y caracteres,Línea base de referencia,Piso que el monoagente y el multiagente deben superar. No forma parte del experimento.

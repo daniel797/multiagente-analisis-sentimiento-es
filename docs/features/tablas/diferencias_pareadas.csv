@@ -1,0 +1,7 @@
+A,B,dif_macro_f1_B_menos_A,ic_inf,ic_sup,p_bootstrap,conclusion
+TF-IDF de palabras,TF-IDF de caracteres,0.0122,-0.0062,0.0319,0.198,no se distingue
+TF-IDF de palabras,TF-IDF palabras + caracteres,0.0103,-0.0036,0.0245,0.135,no se distingue
+TF-IDF de palabras,TF-IDF palabras + numéricas,0.0019,-0.0118,0.0162,0.787,no se distingue
+TF-IDF de caracteres,TF-IDF palabras + caracteres,-0.0018,-0.0156,0.0128,0.824,no se distingue
+Superficie + fenómenos + léxico (24 numéricas),TF-IDF de palabras,0.0472,0.0246,0.0683,0.0,B mejor
+Superficie + fenómenos + léxico (24 numéricas),TF-IDF palabras + numéricas,0.0491,0.0309,0.0669,0.0,B mejor

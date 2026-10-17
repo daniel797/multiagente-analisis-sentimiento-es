@@ -49,3 +49,43 @@ def test_correlaciones_altas_detecta_columnas_redundantes():
     m = pd.DataFrame({"a": range(50), "b": [x * 2 for x in range(50)], "c": [(x * 7) % 5 for x in range(50)]})
     r = F.correlaciones_altas(m, umbral=0.95)
     assert ((r.feature_a == "a") & (r.feature_b == "b")).any()
+
+
+# --- Segunda etapa ---------------------------------------------------------
+import numpy as np  # noqa: E402
+
+
+def test_macro_f1_rapido_coincide_con_sklearn():
+    rng = np.random.default_rng(1)
+    y = rng.choice(F.ETIQUETAS, 300)
+    p = np.where(rng.random(300) < 0.6, y, rng.choice(F.ETIQUETAS, 300))
+    assert abs(F._macro_f1(y, p) - F._macro_f1_rapido(F._codificar(y), F._codificar(p))) < 1e-9
+
+
+def test_diferencias_pareadas_con_predicciones_iguales_da_cero():
+    rng = np.random.default_rng(2)
+    y = rng.choice(F.ETIQUETAS, 200)
+    p = np.where(rng.random(200) < 0.6, y, rng.choice(F.ETIQUETAS, 200))
+    r = F.diferencias_pareadas(y, {"a": p, "b": p}, [("a", "b")], n_boot=200)
+    assert r.dif_macro_f1_B_menos_A.iloc[0] == 0 and r.conclusion.iloc[0] == "no se distingue"
+
+
+def test_diferencias_pareadas_detecta_un_modelo_claramente_mejor():
+    rng = np.random.default_rng(3)
+    y = rng.choice(F.ETIQUETAS, 400)
+    malo = rng.choice(F.ETIQUETAS, 400)
+    r = F.diferencias_pareadas(y, {"a": malo, "b": y}, [("a", "b")], n_boot=200)
+    assert r.conclusion.iloc[0] == "B mejor"
+
+
+def test_perturbaciones_son_reproducibles_y_cambian_lo_esperado():
+    t = "Qué bueno que vinieron, también por la noche"
+    assert F.perturbar(t, "mayusculas", np.random.default_rng(0)) == t.upper()
+    assert F.perturbar(t, "sin_tildes", np.random.default_rng(0)) == "Que bueno que vinieron, tambien por la noche"
+    assert F.perturbar(t, "tipeo", np.random.default_rng(5)) == F.perturbar(t, "tipeo", np.random.default_rng(5))
+    assert "q" in F.perturbar(t, "abreviaturas", np.random.default_rng(0)).split()
+
+
+def test_mapa_features_agentes_tiene_las_tres_columnas():
+    m = F.mapa_features_agentes()
+    assert list(m.columns) == ["componente", "dónde se usa", "para qué"] and len(m) >= 4
