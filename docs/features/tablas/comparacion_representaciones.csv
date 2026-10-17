@@ -1,0 +1,8 @@
+representacion,n_dev,accuracy_dev,macro_f1_dev,macro_f1_ic_inf,macro_f1_ic_sup
+0. Siempre la clase mayoritaria,2465,0.3895,0.1869,0.1801,0.1932
+"1. Superficie (estructural, expresividad, conversacional)",2465,0.4381,0.4268,0.4072,0.4468
+2. Superficie + fenómenos + léxico mínimo,2465,0.512,0.5085,0.4883,0.5284
+3. TF-IDF de palabras,2465,0.5615,0.5556,0.5363,0.5749
+4. TF-IDF de caracteres,2465,0.5712,0.5678,0.5472,0.588
+5. TF-IDF palabras + caracteres,2465,0.5712,0.566,0.5457,0.5852
+6. TF-IDF palabras + todas las numéricas,2465,0.5611,0.5576,0.5375,0.5754

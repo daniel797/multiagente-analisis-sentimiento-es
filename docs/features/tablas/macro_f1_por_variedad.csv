@@ -1,0 +1,36 @@
+representacion,variedad,macro_f1_dev
+0. Siempre la clase mayoritaria,CR,0.1789
+0. Siempre la clase mayoritaria,ES,0.2094
+0. Siempre la clase mayoritaria,MX,0.2205
+0. Siempre la clase mayoritaria,PE,0.1179
+0. Siempre la clase mayoritaria,UY,0.1888
+"1. Superficie (estructural, expresividad, conversacional)",CR,0.4333
+"1. Superficie (estructural, expresividad, conversacional)",ES,0.4199
+"1. Superficie (estructural, expresividad, conversacional)",MX,0.4407
+"1. Superficie (estructural, expresividad, conversacional)",PE,0.327
+"1. Superficie (estructural, expresividad, conversacional)",UY,0.4931
+2. Superficie + fenómenos + léxico mínimo,CR,0.557
+2. Superficie + fenómenos + léxico mínimo,ES,0.5037
+2. Superficie + fenómenos + léxico mínimo,MX,0.506
+2. Superficie + fenómenos + léxico mínimo,PE,0.4375
+2. Superficie + fenómenos + léxico mínimo,UY,0.5303
+3. TF-IDF de palabras,CR,0.5864
+3. TF-IDF de palabras,ES,0.5382
+3. TF-IDF de palabras,MX,0.5587
+3. TF-IDF de palabras,PE,0.501
+3. TF-IDF de palabras,UY,0.5673
+4. TF-IDF de caracteres,CR,0.5942
+4. TF-IDF de caracteres,ES,0.5373
+4. TF-IDF de caracteres,MX,0.5517
+4. TF-IDF de caracteres,PE,0.5238
+4. TF-IDF de caracteres,UY,0.6052
+5. TF-IDF palabras + caracteres,CR,0.6062
+5. TF-IDF palabras + caracteres,ES,0.538
+5. TF-IDF palabras + caracteres,MX,0.5696
+5. TF-IDF palabras + caracteres,PE,0.4994
+5. TF-IDF palabras + caracteres,UY,0.5897
+6. TF-IDF palabras + todas las numéricas,CR,0.59
+6. TF-IDF palabras + todas las numéricas,ES,0.5523
+6. TF-IDF palabras + todas las numéricas,MX,0.5328
+6. TF-IDF palabras + todas las numéricas,PE,0.5062
+6. TF-IDF palabras + todas las numéricas,UY,0.5775

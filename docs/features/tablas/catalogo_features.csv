@@ -1,0 +1,25 @@
+feature,grupo,tipo,definicion,por_que_importa
+n_caracteres,estructural,conteo,Longitud del tuit en caracteres.,Tuits más largos suelen desarrollar más una opinión.
+n_palabras,estructural,conteo,Número de palabras (secuencias de letras).,"Redundante con n_caracteres, se mide para decidir si se conserva."
+long_media_palabra,estructural,razón,Caracteres de letras por palabra.,Un registro más formal suele usar palabras más largas.
+n_oraciones,estructural,conteo,Segmentos terminados en . ! ? (mínimo 1).,Cambios de oración pueden marcar contraste o ironía.
+ratio_mayusculas,estructural,razón,Fracción de letras en mayúscula.,Mayúsculas sostenidas expresan énfasis o enojo.
+n_digitos,estructural,conteo,Cantidad de dígitos.,Cifras y fechas suelen acompañar texto informativo (NEU).
+n_exclamaciones,expresividad,conteo,Signos ! en el tuit.,"Asociado a emoción, sobre todo positiva."
+n_interrogaciones,expresividad,conteo,Signos ? en el tuit.,Las preguntas tienden a ser neutras.
+n_puntos_suspensivos,expresividad,conteo,Secuencias de 3 o más puntos.,"Pueden marcar duda, ironía o tristeza."
+n_alargamientos,expresividad,conteo,Letras repetidas 3 o más veces (holaaa).,Expresividad oral típica de redes.
+n_palabras_mayuscula,expresividad,conteo,Palabras de 3+ letras todas en mayúscula.,Énfasis explícito.
+n_emoticonos,expresividad,conteo,Emoticonos de texto como :) o :(.,"Señal directa de polaridad, aunque escasa."
+n_emojis,expresividad,conteo,Emojis (símbolos pictográficos).,"Casi no hay en este corpus (menos del 0,5%)."
+n_menciones,conversacional,conteo,Menciones @usuario.,Indica conversación directa.
+n_hashtags,conversacional,conteo,Hashtags #tema.,Marca tema o campaña.
+tiene_url,conversacional,binaria,Contiene un enlace.,Suele indicar contenido informativo.
+empieza_con_mencion,conversacional,binaria,El tuit empieza con @usuario (respuesta).,Las respuestas son más personales.
+n_diminutivos,fenomeno,conteo,Palabras con terminación -ito/-ita y similares.,Fenómeno del agente de Percepción (diminutivo afectivo). Regla aproximada.
+n_negaciones,fenomeno,conteo,"no, nunca, jamás, nada, nadie, ni.",Fenómeno del agente de Percepción. La doble negación sale de n_negaciones >= 2.
+n_marcadores_ingles,fenomeno,conteo,Palabras de una lista corta en inglés.,"Aproxima el code-switching, muy escaso aquí."
+n_risas,fenomeno,conteo,"jaja, jeje, xd, lol.",Marcador de humor. No mide sarcasmo.
+n_intensificadores,lexico,conteo,"muy, tan, súper, demasiado, mucho...",Refuerzan la polaridad que acompañan.
+n_lex_positivo,lexico,conteo,Palabras de un léxico mínimo propio de polaridad positiva.,"Léxico corto y transparente, no validado."
+n_lex_negativo,lexico,conteo,Palabras de un léxico mínimo propio de polaridad negativa.,"Léxico corto y transparente, no validado."

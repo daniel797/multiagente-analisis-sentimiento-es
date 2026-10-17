@@ -1,0 +1,3 @@
+representacion,n_dev,n_variedades,azar_aprox,accuracy_dev,macro_f1_dev,macro_f1_ic_inf,macro_f1_ic_sup
+TF-IDF de palabras,2465,5,0.2,0.3858,0.3772,0.3609,0.3939
+TF-IDF de caracteres,2465,5,0.2,0.3862,0.3758,0.3583,0.393
