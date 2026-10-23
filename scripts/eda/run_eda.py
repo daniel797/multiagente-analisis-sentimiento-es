@@ -1,5 +1,6 @@
 """
 Genera el EDA completo del corpus: tablas (CSV) y figuras (PNG) en docs/eda/.
+Incluye la segunda etapa (scripts/eda/eda_extra.py): IC, época vs. país, línea base, potencia y casi duplicados.
 
 Uso (desde la raíz del repositorio):
     python scripts/eda/run_eda.py
@@ -23,6 +24,7 @@ import pandas as pd  # noqa: E402
 from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 sys.path.append(str(Path(__file__).resolve().parent))
+import eda_extra as X  # noqa: E402
 import eda_utils as E  # noqa: E402
 
 # --- Estilo: paleta categórica validada (azul, naranja, aqua, amarillo, magenta) ---
@@ -40,11 +42,33 @@ plt.rcParams.update({
 })
 
 
+RAIZ_REPO = Path(__file__).resolve().parents[2]
+
+
+def _rel(ruta: Path) -> str:
+    """Ruta relativa a la raíz del repo, para no mostrar rutas absolutas de la máquina."""
+    try:
+        return Path(ruta).resolve().relative_to(RAIZ_REPO).as_posix()
+    except ValueError:
+        return Path(ruta).name
+
+
+def _tiene_anotaciones(ruta: Path) -> bool:
+    """True si la muestra de validación ya fue anotada a mano (para no borrar ese trabajo)."""
+    if not ruta.exists():
+        return False
+    try:
+        m = pd.read_csv(ruta, encoding="utf-8", dtype=str, keep_default_na=False)
+        return bool(m[X.COL_VALIDACION].str.strip().ne("").any())
+    except Exception:
+        return False
+
+
 def _guardar(fig, ruta: Path) -> None:
     ruta.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(ruta, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"  figura: {ruta}")
+    print(f"  figura: {_rel(ruta)}")
 
 
 def fig_tamano(corpus: pd.DataFrame, ruta: Path) -> None:
@@ -59,7 +83,7 @@ def fig_tamano(corpus: pd.DataFrame, ruta: Path) -> None:
     ax.set_ylabel("Tuits")
     ax.yaxis.grid(True, color=GRID)
     ax.set_axisbelow(True)
-    ax.set_title("Tuits por variedad y partición")
+    ax.set_title("Tuits por variedad y partición (sin partición de prueba)")
     ax.legend(ncol=2, loc="upper right")
     _guardar(fig, ruta)
 
@@ -190,6 +214,101 @@ def fig_baseline(base: pd.DataFrame, ruta: Path) -> None:
     _guardar(fig, ruta)
 
 
+def fig_neu_por_mes(df: pd.DataFrame, ruta: Path) -> None:
+    """NEU por país y por mes: si Perú sigue arriba en cada mes, no es un efecto de la época."""
+    t = X.etiquetas_por_mes(df, n_min=100)
+    fig, ax = plt.subplots(figsize=(8.6, 4.4))
+    meses = sorted(t["mes"].unique())
+    for var, g in t.groupby("variedad"):
+        g = g.set_index("mes").reindex(meses)
+        ax.plot(range(len(meses)), g["NEU"], marker="o", lw=2.4 if var == "PE" else 1.4,
+                color=COLOR_VAR[var], label=var, alpha=1 if var == "PE" else 0.8)
+    ax.set_xticks(range(len(meses)), meses)
+    ax.set_ylabel("% de tuits NEU")
+    ax.set_ylim(0, 70)
+    ax.yaxis.grid(True, color=GRID)
+    ax.set_axisbelow(True)
+    ax.legend(ncol=5, loc="upper left")
+    ax.set_title("Perú tiene más NEU que los demás en cada mes comparable (meses con 100+ tuits)")
+    _guardar(fig, ruta)
+
+
+def fig_panel_resumen(df: pd.DataFrame, corpus: pd.DataFrame, ruta: Path) -> None:
+    """Una sola lámina con lo esencial del EDA, pensada para la sustentación."""
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    paises = sorted(df["variedad"].unique())
+
+    # (a) etiquetas con IC
+    ax = axs[0, 0]
+    ic = X.ic_etiquetas(df)
+    for k, et in enumerate(E.ETIQUETAS):
+        g = ic[ic.etiqueta == et].set_index("variedad").reindex(paises)
+        x = np.arange(len(paises)) + (k - 1) * 0.22
+        ax.errorbar(x, g["pct"], yerr=[g["pct"] - g["ic_inf"], g["ic_sup"] - g["pct"]], fmt="o",
+                    color=COLOR_ET[et], capsize=3, label=et)
+    ax.set_xticks(np.arange(len(paises)), paises)
+    ax.set_ylabel("% de tuits (IC 95%)")
+    ax.set_ylim(0, 65)
+    ax.yaxis.grid(True, color=GRID)
+    ax.legend(ncol=3, loc="upper left")
+    ax.set_title("Etiquetas por país: Perú es distinto")
+
+    # (b) piso de desempeño
+    ax = axs[0, 1]
+    may = E.baseline_mayoritario(corpus).set_index("variedad").reindex(paises)
+    tf = X.baseline_tfidf(corpus)
+    tf = tf[tf.modelo == "TF-IDF conjunto"].set_index("variedad").reindex(paises)
+    x = np.arange(len(paises))
+    ax.bar(x - 0.19, may["macro_f1_dev"], 0.36, color="#b8b7b0", label="Siempre la clase mayoritaria")
+    ax.bar(x + 0.19, tf["macro_f1_dev"], 0.36, color="#2a78d6", label="TF-IDF + regresión logística")
+    ax.errorbar(x + 0.19, tf["macro_f1_dev"], yerr=[tf["macro_f1_dev"] - tf["macro_f1_ic_inf"], tf["macro_f1_ic_sup"] - tf["macro_f1_dev"]],
+                fmt="none", ecolor=INK2, capsize=3)
+    ax.set_xticks(x, paises)
+    ax.set_ylabel("Macro-F1 en dev")
+    ax.set_ylim(0, 0.8)
+    ax.yaxis.grid(True, color=GRID)
+    ax.set_axisbelow(True)
+    ax.legend(loc="upper left")
+    ax.set_title("Pisos de referencia a superar")
+
+    # (c) concentración temporal
+    ax = axs[1, 0]
+    vp = X.ventana_pico(df).set_index("variedad").reindex(paises)
+    ax.bar(x, vp["pct_tuits_en_ventana"], color=[COLOR_VAR[v] for v in paises])
+    for xi, v in zip(x, vp["pct_tuits_en_ventana"]):
+        ax.text(xi, v + 1.5, f"{v:.0f}%", ha="center", fontsize=9)
+    ax.set_xticks(x, paises)
+    ax.set_ylabel("% de tuits en 14 días")
+    ax.set_ylim(0, 100)
+    ax.yaxis.grid(True, color=GRID)
+    ax.set_axisbelow(True)
+    ax.set_title("Concentración temporal (ventana más densa)")
+
+    # (d) potencia
+    ax = axs[1, 1]
+    n = np.arange(300, 2701, 50)
+    z = 1.96 + 0.8416
+    for d, ls in ((0.10, ":"), (0.20, "-"), (0.30, "--")):
+        ax.plot(n, 100 * z * np.sqrt(d / n), ls, color="#1d4f91", label=f"discrepan en {int(d*100)}% de tuits")
+    ax.axvspan(390, 581, color="#eda100", alpha=0.18, lw=0)
+    ax.text(486, 11.2, "dev por país", ha="center", fontsize=9, color=INK2)
+    ax.axvline(2465, color=INK2, lw=0.8)
+    ax.text(2440, 11.2, "dev conjunto", ha="right", fontsize=9, color=INK2)
+    ax.axhline(2, color="#e34948", lw=1)
+    ax.text(1300, 0.9, "mejora de 2 pp (objetivo del proyecto)", ha="left", fontsize=9, color="#e34948")
+    ax.set_xlabel("Tuits evaluados")
+    ax.set_ylabel("Diferencia mínima detectable (pp)")
+    ax.set_ylim(0, 12.5)
+    ax.yaxis.grid(True, color=GRID)
+    ax.set_axisbelow(True)
+    ax.legend(loc="upper left", bbox_to_anchor=(0.2, 0.9))
+    ax.set_title("Potencia: qué diferencias se pueden detectar")
+
+    fig.suptitle("EDA del corpus: lo esencial en una lámina", x=0.01, ha="left", fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    _guardar(fig, ruta)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--data-dir", default="data")
@@ -202,6 +321,8 @@ def main() -> None:
     corpus = E.cargar_corpus(a.data_dir)
     df = E.agregar_fecha(E.agregar_fenomenos(E.agregar_rasgos(corpus)))
     print(f"Corpus cargado: {len(df)} tuits, variedades {sorted(df['variedad'].unique())}")
+
+    casi_resumen, casi_pares = X.casi_duplicados(corpus)
 
     print("Tablas:")
     salidas = {
@@ -219,10 +340,24 @@ def main() -> None:
         "top_terminos_por_etiqueta": E.top_terminos_por_etiqueta(df),
         "vocabulario_distintivo": E.vocabulario_distintivo(df),
         "muestra_validar_heuristicas": E.muestra_para_validar(df),
+        # Segunda etapa (eda_extra.py)
+        "ic_etiquetas": X.ic_etiquetas(df),
+        "ic_fenomenos": X.ic_fenomenos(df),
+        "etiquetas_por_mes": X.etiquetas_por_mes(df),
+        "comparacion_misma_ventana": X.comparacion_misma_ventana(df),
+        "ventana_pico": X.ventana_pico(df),
+        "baseline_tfidf": X.baseline_tfidf(corpus),
+        "potencia_minima": X.potencia_minima(corpus),
+        "casi_duplicados_resumen": casi_resumen,
+        "casi_duplicados_pares": casi_pares,
     }
     for nombre, t in salidas.items():
-        t.to_csv(tablas / f"{nombre}.csv", index=False, encoding="utf-8")
-        print(f"  tabla: {tablas / (nombre + '.csv')}")
+        destino = tablas / f"{nombre}.csv"
+        if nombre == "muestra_validar_heuristicas" and _tiene_anotaciones(destino):
+            print(f"  tabla: {_rel(destino)} (ya tiene anotaciones a mano, no se sobrescribe)")
+            continue
+        t.to_csv(destino, index=False, encoding="utf-8")
+        print(f"  tabla: {_rel(destino)}")
 
     print("Figuras:")
     figs = out / "figuras"
@@ -233,6 +368,8 @@ def main() -> None:
     fig_fenomenos(df, figs / "fig05_fenomenos.png")
     fig_temporal(df, figs / "fig06_temporal.png")
     fig_baseline(salidas["baseline_mayoritario"], figs / "fig07_baseline_mayoritario.png")
+    fig_neu_por_mes(df, figs / "fig08_neu_por_mes.png")
+    fig_panel_resumen(df, corpus, figs / "fig09_panel_resumen.png")
     print("Listo.")
 
 
