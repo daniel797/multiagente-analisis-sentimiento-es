@@ -47,8 +47,8 @@ Regresión logística entrenada con *train* y medida en *dev* (2.465 tuits), con
 | Siempre la clase mayoritaria | 0,19 (0,18 a 0,19) |
 | Superficie (estructural, expresividad, conversacional) | 0,43 (0,41 a 0,45) |
 | Superficie + fenómenos + léxico mínimo | 0,51 (0,49 a 0,53) |
-| TF-IDF de palabras | 0,56 (0,54 a 0,57) |
-| TF-IDF de caracteres | 0,57 (0,55 a 0,59) |
+| TF-IDF de palabras (1 a 2 palabras) | 0,56 (0,54 a 0,57) |
+| TF-IDF de caracteres (2 a 5 letras dentro de palabra) | 0,57 (0,55 a 0,59) |
 | TF-IDF palabras + caracteres | 0,57 (0,55 a 0,59) |
 | TF-IDF palabras + todas las numéricas | 0,56 (0,54 a 0,58) |
 

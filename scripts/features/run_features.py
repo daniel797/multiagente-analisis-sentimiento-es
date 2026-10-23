@@ -155,16 +155,22 @@ def fig_estabilidad(est: pd.DataFrame, ruta: Path) -> None:
 
 def fig_robustez(rob: pd.DataFrame, ruta: Path) -> None:
     t = rob.pivot(index="perturbacion", columns="representacion", values="caida")
-    fig, ax = plt.subplots(figsize=(9.2, 4))
+    fig, ax = plt.subplots(figsize=(10.4, 4.2))
     lim = float(np.abs(t.values).max())
     im = ax.imshow(t.values, cmap="RdBu", vmin=-lim, vmax=lim, aspect="auto")
-    etiquetas = {"Superficie + fenómenos + léxico (24 numéricas)": "24 numéricas", "TF-IDF de caracteres": "TF-IDF\ncaracteres", "TF-IDF de palabras": "TF-IDF\npalabras",
-                 "TF-IDF palabras + caracteres": "TF-IDF\npal. + car.", "TF-IDF palabras + numéricas": "TF-IDF\npal. + num."}
+    etiquetas = {
+        "Superficie + fenómenos + léxico (24 numéricas)": "24 numéricas",
+        "TF-IDF de palabras": "TF-IDF palabras\n(1 a 2 palabras)",
+        "TF-IDF de caracteres": "TF-IDF caracteres\n(2 a 5 letras)",
+        "TF-IDF palabras + caracteres": "TF-IDF palabras\n+ caracteres",
+        "TF-IDF palabras + numéricas": "TF-IDF palabras\n+ numéricas",
+    }
     ax.set_xticks(range(t.shape[1]), [etiquetas.get(c, c) for c in t.columns], fontsize=9)
     ax.set_yticks(range(t.shape[0]), t.index)
     for i in range(t.shape[0]):
         for j in range(t.shape[1]):
-            ax.text(j, i, f"{t.values[i, j]:+.3f}", ha="center", va="center", fontsize=9, color=R.INK)
+            ax.text(j, i, f"{t.values[i, j]:+.3f}", ha="center", va="center", fontsize=9,
+                    color="white" if abs(t.values[i, j]) > 0.6 * lim else R.INK)
     ax.spines[:].set_visible(False)
     ax.tick_params(length=0)
     fig.colorbar(im, ax=ax, shrink=0.8, label="Cambio en Macro-F1")
