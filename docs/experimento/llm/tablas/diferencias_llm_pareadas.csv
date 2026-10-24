@@ -1,0 +1,7 @@
+variante,ambito,n_dev,predicciones_distintas,variante_acierta_y_base_no,base_acierta_y_variante_no,dif_macro_f1,ic_inf,ic_sup,p_bootstrap,conclusion
+limpio,Todas,2465,206,87,84,0.0028,-0.0085,0.0143,0.601,no se distingue
+limpio,CR,390,35,17,15,0.0057,-0.0259,0.0395,0.704,no se distingue
+limpio,ES,581,46,24,16,0.0148,-0.0078,0.038,0.204,no se distingue
+limpio,MX,510,52,18,20,-0.0056,-0.0307,0.0209,0.64,no se distingue
+limpio,PE,498,54,20,26,-0.0069,-0.0403,0.0235,0.643,no se distingue
+limpio,UY,486,19,8,7,0.005,-0.0125,0.0227,0.572,no se distingue
