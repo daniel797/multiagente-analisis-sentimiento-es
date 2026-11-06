@@ -1,0 +1,19 @@
+variante,ambito,n_dev,predicciones_distintas,variante_acierta_y_base_no,base_acierta_y_variante_no,dif_macro_f1,ic_inf,ic_sup,p_bootstrap,conclusion
+mejor_caracteres,Todas,2465,669,281,257,0.0122,-0.0062,0.0319,0.198,no se distingue
+mejor_caracteres,CR,390,91,38,36,0.0078,-0.0369,0.0521,0.722,no se distingue
+mejor_caracteres,ES,581,166,66,68,-0.0009,-0.0394,0.0375,0.983,no se distingue
+mejor_caracteres,MX,510,144,53,59,-0.007,-0.0487,0.0347,0.731,no se distingue
+mejor_caracteres,PE,498,143,64,53,0.0228,-0.0187,0.0645,0.282,no se distingue
+mejor_caracteres,UY,486,125,60,41,0.0379,-0.0036,0.0784,0.077,no se distingue
+mejor_palabras,Todas,2465,89,37,32,0.0019,-0.0049,0.0085,0.566,no se distingue
+mejor_palabras,CR,390,13,8,3,0.0145,-0.0019,0.0315,0.091,no se distingue
+mejor_palabras,ES,581,22,9,4,0.0077,-0.0039,0.0196,0.209,no se distingue
+mejor_palabras,MX,510,11,6,5,0.0021,-0.0111,0.0155,0.749,no se distingue
+mejor_palabras,PE,498,23,6,12,-0.0123,-0.0286,0.003,0.139,no se distingue
+mejor_palabras,UY,486,20,8,8,-0.0013,-0.0177,0.0155,0.885,no se distingue
+mejor_numerico,Todas,2465,926,315,437,-0.0472,-0.0683,-0.0246,0.0,A mejor
+mejor_numerico,CR,390,125,48,59,-0.0294,-0.0797,0.0236,0.294,no se distingue
+mejor_numerico,ES,581,236,83,110,-0.0345,-0.0803,0.0126,0.159,no se distingue
+mejor_numerico,MX,510,198,62,94,-0.0527,-0.101,-0.0032,0.036,A mejor
+mejor_numerico,PE,498,192,62,97,-0.0635,-0.1093,-0.0155,0.01,A mejor
+mejor_numerico,UY,486,175,60,77,-0.0371,-0.0835,0.0113,0.127,no se distingue

@@ -38,15 +38,20 @@ Este repositorio documenta el avance del proyecto semana a semana. El estado act
 ├── docs/
 │   ├── eda/              # Resultados del EDA: RESUMEN_EDA.md, tablas/ (CSV) y figuras/ (PNG)
 │   ├── features/         # Resultados de Feature Engineering: RESUMEN_FEATURES.md, tablas/ y figuras/
+│   ├── experimento/      # Baseline y variantes de los datos: RESUMEN_EXPERIMENTO.md, tablas/ y figuras/
+│   ├── informe/          # Informe de EDA, Feature Engineering y experimento de baseline
+│   ├── MATRIZ_CONSISTENCIA.md  # Problema, objetivos, hipótesis, variables e indicadores
 │   └── *.pdf             # Avances entregados (PDFs de cada semana)
-├── notebooks/           # 01 exploración inicial · 02 EDA · 03 Feature Engineering
+├── notebooks/           # 01 exploración inicial · 02 EDA · 03 Feature Engineering · 04 corrida del LLM en Colab y su análisis · 05 importancia de variables · 06 optimización de hiperparámetros del baseline
 ├── scripts/
 │   ├── data/             # Consolidación, partición y auditoría del dataset
 │   ├── eda/              # Análisis exploratorio (tablas y figuras)
 │   ├── features/         # Catálogo de características y líneas base de referencia
+│   ├── experimento/      # Variantes de los datos, baseline clásico y monoagente con Salamandra
 │   └── utils/            # Funciones compartidas (lectura/escritura, logging)
-├── tests/               # Pruebas de los scripts de datos, EDA y features
+├── tests/               # Pruebas de los scripts de datos, EDA, features y experimento
 ├── requirements.txt
+├── requirements-llm.txt  # Solo para correr el LLM (GPU)
 └── README.md
 ```
 
@@ -75,6 +80,11 @@ Para reproducir el proyecto:
 | `scripts/eda/validar_heuristicas.py` | Calcula la precisión de las reglas de fenómenos a partir de la muestra anotada a mano (`docs/eda/tablas/muestra_validar_heuristicas.csv`). |
 | `scripts/features/feature_utils.py` | Feature Engineering: catálogo de 24 características lingüísticas y de superficie, normalización del texto para el prompt, banderas de Percepción y modelos de referencia (TF-IDF). |
 | `scripts/features/run_features.py` | Genera el análisis de Feature Engineering: 16 tablas CSV en `docs/features/tablas/` y 8 figuras en `docs/features/figuras/`. |
+| `scripts/experimento/variantes_datos.py` | Variantes del texto de entrada (base, limpio y sus componentes), compartidas por el baseline y el LLM. |
+| `scripts/experimento/run_baseline_variantes.py` | Baseline clásico (TF-IDF + regresión logística) con cada variante: 4 tablas CSV en `docs/experimento/tablas/` y 2 figuras. |
+| `scripts/experimento/monoagente_salamandra.py` | Monoagente (B1) con Salamandra-7B-Instruct sobre cada variante, reanudable. Corrido en Colab (resultados en `docs/experimento/llm/`). |
+| `scripts/experimento/comparar_llm_vs_clasico.py` | Compara el LLM con el baseline clásico sobre los mismos tuits (diferencia pareada, clases predichas, F1 por clase) y verifica las tablas. |
+| `scripts/experimento/evaluacion.py` | Macro-F1 con bootstrap y diferencia pareada contra la base, común al baseline y al LLM. |
 | `scripts/utils/io_utils.py` | Funciones compartidas de lectura/escritura y logging usadas por los scripts anteriores. |
 
 Ninguno de estos scripts entrena un modelo: preparan los datos. La implementación de los agentes (`agents/`) queda como siguiente etapa, una vez cerrada la auditoría del corpus.
@@ -106,12 +116,36 @@ El proyecto no entrena ningún modelo, pero sí tiene ingeniería de caracterís
 - La señal que más distingue las etiquetas viene del **léxico**, la **negación** y las **exclamaciones**. La longitud, los emojis y el code-switching casi no aportan.
 - Las banderas del agente de Percepción, como reglas aisladas, dicen poco (salvo la doble negación). Su valor tendría que estar en interpretarlas en contexto.
 - Las características conversacionales (menciones, hashtags, enlaces) se ligan más al país que al sentimiento, y el texto por sí solo delata parcialmente el país (Macro-F1 de 0,38 frente a 0,20 al azar).
-- **Qué aporta cada grupo:** el léxico es lo único indispensable. Con 3 características de léxico se llega a 0,48 de Macro-F1, frente a 0,51 con las 24.
+- **Qué aporta cada grupo:** el léxico es lo único indispensable. Con 3 características de léxico se llega a 0,48 de Macro-F1, frente a 0,51 con las 24. Detalle de la importancia por variable en `docs/features/IMPORTANCIA_VARIABLES.md` y `notebooks/05_importancia_variables.ipynb`.
 - **Robustez:** las características de mayúsculas son frágiles (el modelo numérico cae 0,084 al poner todo en mayúsculas), y TF-IDF no cambia. Sirve de referencia para la prueba de robustez del LLM.
 - **Pisos de referencia en *dev*:** clase mayoritaria 0,19 y TF-IDF 0,56 a 0,57 de Macro-F1, sin diferencias distinguibles entre las variantes de TF-IDF (prueba pareada). Los modelos de referencia se ajustan solo con *train* y no forman parte del experimento.
 
 ```bash
 python scripts/features/run_features.py      # regenera docs/features/tablas y docs/features/figuras
+```
+
+## Experimento: baseline y variantes de los datos
+
+Se compara una línea base (el tuit como lo ve el LLM) contra una variante de texto limpio (minúsculas, sin tildes, sin alargamientos, sin emojis), con un baseline clásico y con el monoagente (B1) de Salamandra-7B-Instruct. Detalle en [`docs/experimento/RESUMEN_EXPERIMENTO.md`](docs/experimento/RESUMEN_EXPERIMENTO.md). Todo se mide en *dev* (2.465 tuits).
+
+| | Base | Limpio |
+|---|---|---|
+| TF-IDF + regresión logística | 0,556 | 0,557 |
+| Monoagente Salamandra-7B-Instruct (B1) | 0,479 | 0,482 |
+
+Macro-F1. Clase mayoritaria: 0,19.
+
+- **El texto limpio no cambia nada**, ni en el baseline clásico (+0,001) ni en el LLM (+0,003). En ningún caso el intervalo pareado excluye el cero.
+- **El monoagente queda por debajo de TF-IDF:** −0,076 de Macro-F1 (IC 95% de −0,102 a −0,052). En CR, ES y MX la diferencia es clara. En Perú y Uruguay no se distingue.
+- **El LLM casi no predice NEG:** 6% de los tuits, cuando el 39% lo es. De 960 tuits NEG reales, 748 salen como NEU. Con el prompt `B1-v1` es conservador. Que sea un efecto del prompt y no del modelo es una hipótesis que no se probó.
+- Modelo: `BSC-LT/salamandra-7b-instruct`, revisión `a3ed5452fafb3698a0423b1a18bfb5888f4e611b`, 4 bits, decodificación determinista. El prompt no se ajustó con *dev*.
+- Limitaciones: no hay partición de prueba, hay una sola corrida y no se registraron la GPU ni las versiones de las librerías.
+
+```bash
+python scripts/experimento/run_baseline_variantes.py       # baseline clásico: docs/experimento/tablas y figuras
+python scripts/experimento/monoagente_salamandra.py ejecutar --variantes base limpio --out docs/experimento/llm   # necesita GPU (ver notebooks/04)
+python scripts/experimento/monoagente_salamandra.py resumir --out docs/experimento/llm
+python scripts/experimento/comparar_llm_vs_clasico.py      # LLM contra TF-IDF, mismos tuits
 ```
 
 ## Modelo base
@@ -134,6 +168,10 @@ python scripts/eda/run_eda.py
 
 # Feature Engineering
 python scripts/features/run_features.py
+
+# Baseline y variantes de los datos
+python scripts/experimento/run_baseline_variantes.py
+python scripts/experimento/comparar_llm_vs_clasico.py   # tras tener docs/experimento/llm/predicciones_llm.csv
 ```
 
 ## Estado del proyecto
@@ -142,6 +180,10 @@ python scripts/features/run_features.py
 - [x] Scripts de consolidación, partición y auditoría del corpus
 - [x] EDA del corpus por variedad (`docs/eda/`, `notebooks/02_eda.ipynb`)
 - [x] Feature Engineering (`docs/features/`, `notebooks/03_feature_engineering.ipynb`)
+- [x] Baseline clásico con variante de datos (`docs/experimento/`)
+- [x] Monoagente (B1) corrido con Salamandra-7B-Instruct en Colab (`docs/experimento/llm/`, `notebooks/04_experimento_baseline.ipynb`; incluye el análisis detallado sin GPU; informe en `docs/informe/`)
+- [x] Matriz de consistencia (`docs/MATRIZ_CONSISTENCIA.md`) e importancia de variables (`docs/features/IMPORTANCIA_VARIABLES.md`, `notebooks/05_importancia_variables.ipynb`)
+- [x] Optimización de hiperparámetros del baseline clásico (`docs/hiperparametros/RESUMEN_HIPERPARAMETROS.md`, `notebooks/06_optimizacion_hiperparametros.ipynb`)
 - [ ] Implementación de los agentes (Percepción, Razonamiento, Resolución, Coordinador)
 - [ ] Ejecución de las condiciones experimentales (B1, B3, B4, B5, B6)
 - [ ] Evaluación y análisis estadístico
