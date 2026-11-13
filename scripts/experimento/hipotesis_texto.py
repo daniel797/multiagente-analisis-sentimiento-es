@@ -1,12 +1,4 @@
-"""Variantes por hipótesis lingüística: ¿qué pasa si quito cierta clase de palabras o la puntuación?
-
-Cada variante cambia solo el texto que recibe el modelo; el modelo es el mismo (regresión logística balanceada, C = 1).
-Se mide con los mismos 5 pliegues de train y bootstrap pareado contra su control. Dev no se usa.
-Requiere spaCy y es_core_news_md (3.8.0) para las etiquetas gramaticales.
-
-Uso (desde la raíz del repo):  python scripts/experimento/hipotesis_texto.py
-Salida: docs/validacion/tablas/variantes_hipotesis_cv.csv
-"""
+"""Variantes por hipótesis lingüística: ¿qué pasa si quito cierta clase de palabras o la puntuación?"""
 from __future__ import annotations
 import sys
 from pathlib import Path
@@ -21,7 +13,7 @@ from sklearn.metrics import f1_score
 NEGACIONES = {"no", "ni", "nunca", "jamás", "jamas", "tampoco", "nada", "nadie", "ningún", "ninguno", "ninguna", "sin"}
 FUNCIONALES = {"DET", "ADP", "CCONJ", "SCONJ", "PRON", "AUX", "PART", "PUNCT", "SYM"}
 CONTENIDO = {"NOUN", "PROPN", "ADJ", "VERB", "ADV", "INTJ"}
-# nombre: (hipótesis, función que decide si se conserva la palabra)
+
 VARIANTES = {
     "sin_articulos": ("Los artículos no aportan información, agregan ruido", lambda x, p: p != "DET"),
     "sin_puntuacion": ("La puntuación no aporta información", lambda x, p: p not in ("PUNCT", "SYM")),

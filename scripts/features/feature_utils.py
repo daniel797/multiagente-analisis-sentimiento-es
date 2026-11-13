@@ -1,20 +1,4 @@
-"""
-Feature Engineering para el análisis de sentimiento en variedades del español.
-
-El experimento principal (monoagente vs. multiagente) no entrena nada: un LLM recibe el
-texto y devuelve una etiqueta. Aun así hay trabajo de ingeniería de características:
-
-1. Representación del texto que ve el LLM (normalización mínima, sin pasar la variedad).
-2. Catálogo de características lingüísticas y de superficie, calculadas con reglas, que sirven
-   para (a) entender qué señales tiene el corpus, (b) contrastar lo que reporta el agente de
-   Percepción, y (c) construir líneas base de referencia.
-3. Representaciones TF-IDF (palabras y caracteres), usadas SOLO como piso de comparación.
-4. Análisis de qué grupos de características aportan señal y cuáles delatan la variedad
-   en lugar del sentimiento (posible atajo o confusión).
-
-Regla de higiene: todo lo que se ajusta (vectorizadores, escalado, modelos de referencia) se ajusta
-SOLO con train y se mide SOLO en dev. Nada de esto toca una partición de prueba.
-"""
+"""Feature Engineering para el análisis de sentimiento en variedades del español."""
 from __future__ import annotations
 
 import sys
@@ -32,14 +16,12 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.preprocessing import StandardScaler
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "eda"))
-import eda_extra as X  # noqa: E402
-import eda_utils as E  # noqa: E402
+import eda_extra as X
+import eda_utils as E
 
 ETIQUETAS = E.ETIQUETAS
 
-# ----------------------------------------------------------------------------
-# Patrones
-# ----------------------------------------------------------------------------
+
 _MENCION = re.compile(r"@\w+")
 _HASHTAG = re.compile(r"#\w+")
 _URL = re.compile(r"https?://\S+|www\.\S+")
@@ -59,8 +41,7 @@ _INTENSIF = re.compile(
     re.IGNORECASE,
 )
 
-# Léxico mínimo propio (sin acentos). Es corto y transparente a propósito: no reemplaza a un léxico
-# validado. Se incluye para medir cuánta señal aporta una lista pequeña antes de buscar una mejor.
+
 LEXICO_POSITIVO = {
     "bien", "bueno", "buena", "buenos", "buenas", "feliz", "felices", "felicidades", "gracias", "genial",
     "excelente", "lindo", "linda", "hermoso", "hermosa", "amor", "amo", "encanta", "mejor", "gusta",
@@ -77,11 +58,8 @@ def _sin_acentos(texto: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
 
 
-# ----------------------------------------------------------------------------
-# Catálogo de características
-# ----------------------------------------------------------------------------
 CATALOGO = [
-    # (nombre, grupo, tipo, definición, por qué podría importar)
+
     ("n_caracteres", "estructural", "conteo", "Longitud del tuit en caracteres.", "Tuits más largos suelen desarrollar más una opinión."),
     ("n_palabras", "estructural", "conteo", "Número de palabras (secuencias de letras).", "Redundante con n_caracteres, se mide para decidir si se conserva."),
     ("long_media_palabra", "estructural", "razón", "Caracteres de letras por palabra.", "Un registro más formal suele usar palabras más largas."),
@@ -115,9 +93,6 @@ def catalogo_features() -> pd.DataFrame:
     return pd.DataFrame(CATALOGO, columns=["feature", "grupo", "tipo", "definicion", "por_que_importa"])
 
 
-# ----------------------------------------------------------------------------
-# Extracción
-# ----------------------------------------------------------------------------
 def extraer_features(texto: str) -> dict:
     t = texto or ""
     sa = _sin_acentos(t)
@@ -160,27 +135,14 @@ def construir_matriz(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(list(filas), index=df.index)[NOMBRES]
 
 
-# ----------------------------------------------------------------------------
-# Texto que ve el LLM
-# ----------------------------------------------------------------------------
 def normalizar_para_llm(texto: str) -> str:
-    """
-    Normalización mínima del tuit antes de ponerlo en un prompt:
-    - @usuario -> @USUARIO y enlaces -> URL (privacidad y menos ruido),
-    - espacios repetidos colapsados.
-    NO se toca mayúsculas, puntuación, alargamientos, emojis ni tildes: son señales que el LLM debe ver.
-    NO se agrega la variedad dialectal: el sistema no debe saber de qué país es el tuit.
-    """
+    """Normalización mínima del tuit antes de ponerlo en un prompt:"""
     t = _URL.sub("URL", _MENCION.sub("@USUARIO", texto or ""))
     return re.sub(r"\s+", " ", t).strip()
 
 
 def pistas_percepcion(texto: str) -> dict:
-    """
-    Banderas heurísticas con la misma forma que la salida del agente de Percepción.
-    Sirven para contrastar al agente (acuerdo entre agente y regla) y como piso de comparación,
-    no como verdad. La regla de risa se llama marcador_risa y no sarcasmo.
-    """
+    """Banderas heurísticas con la misma forma que la salida del agente de Percepción."""
     f = extraer_features(texto)
     return {
         "diminutivo_afectivo": f["n_diminutivos"] > 0,
@@ -191,10 +153,7 @@ def pistas_percepcion(texto: str) -> dict:
 
 
 def perfil_pistas(corpus: pd.DataFrame, matriz: pd.DataFrame) -> pd.DataFrame:
-    """
-    Para cada bandera heurística de Percepción: cuántos tuits la activan y cómo se reparten sus etiquetas
-    frente al total. Muestra si la bandera, sola, dice algo del sentimiento.
-    """
+    """Para cada bandera heurística de Percepción: cuántos tuits la activan y cómo se reparten sus etiquetas"""
     banderas = {
         "diminutivo_afectivo": matriz["n_diminutivos"] > 0,
         "doble_negacion": matriz["n_negaciones"] >= 2,
@@ -210,9 +169,6 @@ def perfil_pistas(corpus: pd.DataFrame, matriz: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(filas)
 
 
-# ----------------------------------------------------------------------------
-# Asociación univariada y confusión con la variedad
-# ----------------------------------------------------------------------------
 def _epsilon2(valores: pd.Series, grupos: pd.Series) -> tuple[float, float]:
     """Kruskal-Wallis entre grupos. Devuelve (epsilon², p). epsilon² = H/(n-1): tamaño de efecto 0 a 1."""
     muestras = [valores[grupos == g].values for g in grupos.unique()]
@@ -223,11 +179,7 @@ def _epsilon2(valores: pd.Series, grupos: pd.Series) -> tuple[float, float]:
 
 
 def asociacion_univariada(matriz: pd.DataFrame, etiquetas: pd.Series, variedades: pd.Series) -> pd.DataFrame:
-    """
-    Para cada característica: tamaño de efecto respecto a la etiqueta y respecto a la variedad.
-    Si una característica se relaciona más con la variedad que con la etiqueta, puede actuar como
-    atajo (el sistema aprendería el país en lugar del sentimiento) o reflejar el sesgo de recolección.
-    """
+    """Para cada característica: tamaño de efecto respecto a la etiqueta y respecto a la variedad."""
     filas = []
     for f in matriz.columns:
         e_et, p_et = _epsilon2(matriz[f], etiquetas)
@@ -256,9 +208,6 @@ def correlaciones_altas(matriz: pd.DataFrame, umbral: float = 0.85) -> pd.DataFr
     return pd.DataFrame(filas, columns=["feature_a", "feature_b", "spearman_abs"])
 
 
-# ----------------------------------------------------------------------------
-# Modelos de referencia por grupos de características
-# ----------------------------------------------------------------------------
 def _lr() -> LogisticRegression:
     return LogisticRegression(max_iter=3000, class_weight="balanced", random_state=0)
 
@@ -276,10 +225,7 @@ def _numericas(grupos: list[str]) -> list[str]:
 
 
 def comparar_representaciones(corpus: pd.DataFrame, n_boot: int = 500) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Compara qué representación aporta más señal. Todo se ajusta con train y se mide en dev.
-    Devuelve (resumen_conjunto, macro_f1_por_variedad).
-    """
+    """Compara qué representación aporta más señal. Todo se ajusta con train y se mide en dev."""
     c = corpus.reset_index(drop=True)
     c["_txt"] = c["texto"].map(normalizar_para_llm)
     M = construir_matriz(c)
@@ -348,10 +294,7 @@ def terminos_por_clase(corpus: pd.DataFrame, k: int = 12) -> pd.DataFrame:
 
 
 def prediccion_de_variedad(corpus: pd.DataFrame, n_boot: int = 300) -> pd.DataFrame:
-    """
-    ¿Se puede adivinar el país solo con el texto? Si sí, el LLM podría 'saber' de dónde es el tuit aunque
-    no se le diga, y las diferencias entre países pueden mezclarse con diferencias de tema o época.
-    """
+    """¿Se puede adivinar el país solo con el texto? Si sí, el LLM podría 'saber' de dónde es el tuit aunque"""
     c = corpus
     txt = c["texto"].map(normalizar_para_llm)
     tr, dv = (c.split == "train").values, (c.split == "dev").values
@@ -375,9 +318,6 @@ def prediccion_de_variedad(corpus: pd.DataFrame, n_boot: int = 300) -> pd.DataFr
     return pd.DataFrame(out)
 
 
-# ----------------------------------------------------------------------------
-# Segunda etapa: comparaciones pareadas, ablación, importancia y estabilidad
-# ----------------------------------------------------------------------------
 GRUPOS_NUM = ["estructural", "expresividad", "conversacional", "fenomeno", "lexico"]
 
 
@@ -404,10 +344,7 @@ def _macro_f1_rapido(y: np.ndarray, p: np.ndarray) -> float:
 
 
 class Representaciones:
-    """
-    Ajusta, SOLO con train, todas las representaciones y deja predecir sobre cualquier texto.
-    Sirve para comparar modelos de forma pareada (mismos tuits) y para probar perturbaciones.
-    """
+    """Ajusta, SOLO con train, todas las representaciones y deja predecir sobre cualquier texto."""
 
     def __init__(self, corpus: pd.DataFrame):
         c = corpus.reset_index(drop=True)
@@ -444,11 +381,7 @@ class Representaciones:
 
 
 def diferencias_pareadas(y, preds: dict, pares: list[tuple[str, str]], n_boot: int = 2000, seed: int = 0) -> pd.DataFrame:
-    """
-    Diferencia de Macro-F1 entre dos representaciones medidas sobre LOS MISMOS tuits (bootstrap pareado).
-    Un IC que incluye 0 significa que no se puede afirmar que una sea mejor. Esto es más fiable que
-    comparar si dos intervalos separados se solapan.
-    """
+    """Diferencia de Macro-F1 entre dos representaciones medidas sobre LOS MISMOS tuits (bootstrap pareado)."""
     rng = np.random.default_rng(seed)
     y = _codificar(y)
     idx = [rng.integers(0, len(y), len(y)) for _ in range(n_boot)]
@@ -468,10 +401,7 @@ def diferencias_pareadas(y, preds: dict, pares: list[tuple[str, str]], n_boot: i
 
 
 def ablacion_por_grupo(corpus: pd.DataFrame, n_boot: int = 1000, seed: int = 0) -> pd.DataFrame:
-    """
-    Con las 24 características numéricas: Macro-F1 del modelo completo, quitando cada grupo y usando
-    cada grupo solo. Mide cuánto aporta cada grupo y si es reemplazable por los demás.
-    """
+    """Con las 24 características numéricas: Macro-F1 del modelo completo, quitando cada grupo y usando"""
     c = corpus.reset_index(drop=True)
     tr, dv = c[c.split == "train"], c[c.split == "dev"]
     Mtr, Mdv = construir_matriz(tr), construir_matriz(dv)
@@ -503,10 +433,7 @@ def ablacion_por_grupo(corpus: pd.DataFrame, n_boot: int = 1000, seed: int = 0) 
 
 
 def importancia_permutacion(corpus: pd.DataFrame, n_repeats: int = 15, seed: int = 0) -> pd.DataFrame:
-    """
-    Importancia por permutación en dev para el modelo de las 24 características: cuánto cae el Macro-F1
-    cuando se desordena una columna. Es más fiable que la asociación univariada porque considera a las demás.
-    """
+    """Importancia por permutación en dev para el modelo de las 24 características: cuánto cae el Macro-F1"""
     from sklearn.inspection import permutation_importance
 
     c = corpus.reset_index(drop=True)
@@ -521,7 +448,108 @@ def importancia_permutacion(corpus: pd.DataFrame, n_repeats: int = 15, seed: int
     return out.sort_values("caida_macro_f1", ascending=False).reset_index(drop=True).round(4)
 
 
-# --- Perturbaciones (las mismas familias que la prueba de robustez del proyecto) ---
+def _modelo_numerico(corpus: pd.DataFrame):
+    """Modelo de las 24 características (el mismo de la ablación y la permutación): train para ajustar, dev para medir."""
+    c = corpus.reset_index(drop=True)
+    tr, dv = c[c.split == "train"], c[c.split == "dev"].reset_index(drop=True)
+    cols = _numericas(GRUPOS_NUM)
+    Mtr, Mdv = construir_matriz(tr)[cols], construir_matriz(dv)[cols]
+    sc = StandardScaler().fit(Mtr)
+    m = _lr().fit(sc.transform(Mtr), tr["etiqueta"])
+    return m, sc.transform(Mdv), dv, cols
+
+
+def _f1_por_clase(y, p, clases) -> np.ndarray:
+    from sklearn.metrics import f1_score
+
+    return f1_score(y, p, labels=clases, average=None, zero_division=0)
+
+
+def importancia_por_clase(corpus: pd.DataFrame, n_repeats: int = 15, seed: int = 0) -> pd.DataFrame:
+    """Igual que la importancia por permutación, pero mirando el F1 de cada clase por separado: cuánto cae el F1 de"""
+    m, X, dv, cols = _modelo_numerico(corpus)
+    y, clases = dv["etiqueta"].values, list(m.classes_)
+    base = _f1_por_clase(y, m.predict(X), clases)
+    rng = np.random.default_rng(seed)
+    filas = []
+    for j, nombre in enumerate(cols):
+        caidas = []
+        for _ in range(n_repeats):
+            Xp = X.copy()
+            Xp[:, j] = rng.permutation(Xp[:, j])
+            caidas.append(base - _f1_por_clase(y, m.predict(Xp), clases))
+        media = np.mean(caidas, axis=0)
+        fila = {"feature": nombre, **{f"caida_f1_{c_}": media[i] for i, c_ in enumerate(clases)}}
+        filas.append(fila)
+    out = pd.DataFrame(filas)
+    out["grupo"] = out["feature"].map({c_[0]: c_[1] for c_ in CATALOGO})
+    out["caida_max"] = out[[f"caida_f1_{c_}" for c_ in clases]].max(axis=1)
+    return out.sort_values("caida_max", ascending=False).drop(columns="caida_max").reset_index(drop=True).round(4)
+
+
+def coeficientes_estandarizados(corpus: pd.DataFrame) -> pd.DataFrame:
+    """Coeficientes de la regresión logística con las variables estandarizadas, por clase. Un coeficiente positivo"""
+    m, _, _, cols = _modelo_numerico(corpus)
+    out = pd.DataFrame(m.coef_.T, columns=[f"coef_{c_}" for c_ in m.classes_])
+    out.insert(0, "feature", cols)
+    out["grupo"] = out["feature"].map({c_[0]: c_[1] for c_ in CATALOGO})
+    return out.round(4)
+
+
+BLOQUES_CORRELACIONADOS = {
+    "longitud": ["n_caracteres", "n_palabras"],
+    "menciones": ["n_menciones", "empieza_con_mencion"],
+}
+
+
+def importancia_en_bloques(corpus: pd.DataFrame, bloques: dict | None = None, n_repeats: int = 15, seed: int = 0) -> pd.DataFrame:
+    """Permutación de variables muy correlacionadas a la vez (con el mismo desorden de filas). Evita que dos variables"""
+    from sklearn.metrics import f1_score
+
+    bloques = bloques or BLOQUES_CORRELACIONADOS
+    m, X, dv, cols = _modelo_numerico(corpus)
+    y = dv["etiqueta"].values
+    base = f1_score(y, m.predict(X), average="macro")
+    rng = np.random.default_rng(seed)
+    filas = []
+    for nombre, miembros in bloques.items():
+        idx = [cols.index(c_) for c_ in miembros]
+        caidas = []
+        for _ in range(n_repeats):
+            Xp = X.copy()
+            Xp[:, idx] = Xp[rng.permutation(len(Xp))][:, idx]
+            caidas.append(base - f1_score(y, m.predict(Xp), average="macro"))
+        filas.append({"bloque": nombre, "variables": " + ".join(miembros), "caida_macro_f1": float(np.mean(caidas)), "desv": float(np.std(caidas))})
+    return pd.DataFrame(filas).round(4)
+
+
+def importancia_por_variedad(corpus: pd.DataFrame, n_repeats: int = 10, seed: int = 0) -> pd.DataFrame:
+    """Caída de Macro-F1 por permutación, calculada dentro de cada variedad de dev (el modelo se ajusta con todo train)."""
+    m, X, dv, cols = _modelo_numerico(corpus)
+    y, var = dv["etiqueta"].values, dv["variedad"].values
+    rng = np.random.default_rng(seed)
+    out = {}
+    for v in sorted(set(var)):
+        mk = var == v
+        Xv, yv = X[mk], y[mk]
+        from sklearn.metrics import f1_score
+
+        base = f1_score(yv, m.predict(Xv), average="macro")
+        caidas = []
+        for j in range(len(cols)):
+            c_ = []
+            for _ in range(n_repeats):
+                Xp = Xv.copy()
+                Xp[:, j] = rng.permutation(Xp[:, j])
+                c_.append(base - f1_score(yv, m.predict(Xp), average="macro"))
+            caidas.append(np.mean(c_))
+        out[v] = caidas
+    res = pd.DataFrame(out, index=cols)
+    res.index.name = "feature"
+    res["grupo"] = res.index.map({c_[0]: c_[1] for c_ in CATALOGO})
+    return res.reset_index().round(4)
+
+
 def perturbar(texto: str, tipo: str, rng: np.random.Generator) -> str:
     if tipo == "sin_tildes":
         return _sin_acentos(texto)
@@ -551,10 +579,7 @@ PERTURBACIONES = ["sin_tildes", "mayusculas", "minusculas", "alargar_letras", "t
 
 
 def estabilidad_features(corpus: pd.DataFrame, seed: int = 0) -> pd.DataFrame:
-    """
-    Porcentaje de tuits del dev en los que cambia el valor de cada característica bajo cada perturbación.
-    Una característica estable cambia poco, una frágil mide el formato y no el contenido.
-    """
+    """Porcentaje de tuits del dev en los que cambia el valor de cada característica bajo cada perturbación."""
     dv = corpus[corpus.split == "dev"]
     base = construir_matriz(dv)
     filas = {}

@@ -1,8 +1,4 @@
-"""
-Funciones compartidas de lectura/escritura y logging para los scripts de datos.
-
-No depende de ningún modelo ni de la data real: solo maneja archivos.
-"""
+"""Funciones compartidas de lectura/escritura y logging para los scripts de datos."""
 from __future__ import annotations
 
 import logging
@@ -33,10 +29,7 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 def read_table_any(path: str | Path) -> pd.DataFrame:
-    """
-    Lee CSV, TSV o XLSX según la extensión del archivo.
-    Pensado para los distintos formatos en que puede llegar cada variedad de TASS.
-    """
+    """Lee CSV, TSV o XLSX según la extensión del archivo."""
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".tsv":

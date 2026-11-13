@@ -1,19 +1,4 @@
-"""
-Funciones del análisis exploratorio (EDA) del corpus TASS 2020 por variedad.
-
-Las usan tanto `scripts/eda/run_eda.py` (genera tablas y figuras en docs/eda/)
-como el notebook `notebooks/02_eda.ipynb`, para que las cifras sean las mismas
-en ambos lados.
-
-Estructura de datos esperada (la que tiene el repositorio):
-
-    data/train/<variedad>.tsv
-    data/dev/<variedad>.tsv
-
-Cada archivo es un TSV SIN encabezado con tres columnas: id del tuit, texto y
-etiqueta (P / N / NEU). Los textos pueden contener comillas, por eso se lee con
-quoting=QUOTE_NONE.
-"""
+"""Funciones del análisis exploratorio (EDA) del corpus TASS 2020 por variedad."""
 from __future__ import annotations
 
 import csv
@@ -27,13 +12,13 @@ from scipy.stats import chi2_contingency, ks_2samp
 from sklearn.metrics import accuracy_score, f1_score
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from scripts.data.audit_phenomena import contar_fenomenos  # noqa: E402
+from scripts.data.audit_phenomena import contar_fenomenos
 
-ETIQUETAS = ["NEG", "NEU", "POS"]  # orden de menos a más positivo
+ETIQUETAS = ["NEG", "NEU", "POS"]
 LABEL_MAP = {"N": "NEG", "NEU": "NEU", "P": "POS"}
 SPLITS = ("train", "dev")
 
-# Epoch de los ids de Twitter (snowflake): permite recuperar la fecha del tuit.
+
 _TWITTER_EPOCH_MS = 1288834974657
 
 _RE_MENCION = re.compile(r"@\w+")
@@ -59,9 +44,6 @@ STOPWORDS = set(
 )
 
 
-# ----------------------------------------------------------------------------
-# Carga
-# ----------------------------------------------------------------------------
 def cargar_corpus(data_dir: str | Path = "data") -> pd.DataFrame:
     """Lee data/<split>/<variedad>.tsv y devuelve un único DataFrame."""
     data_dir = Path(data_dir)
@@ -98,9 +80,6 @@ def _normalizar(texto: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-# ----------------------------------------------------------------------------
-# Calidad de datos
-# ----------------------------------------------------------------------------
 def reporte_calidad(corpus: pd.DataFrame) -> pd.DataFrame:
     """Una fila por chequeo: qué se revisó y cuántos casos hay."""
     norm = corpus["texto"].map(_normalizar)
@@ -124,9 +103,6 @@ def reporte_calidad(corpus: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(filas, columns=["chequeo", "casos"])
 
 
-# ----------------------------------------------------------------------------
-# Etiquetas
-# ----------------------------------------------------------------------------
 def tabla_etiquetas(corpus: pd.DataFrame) -> pd.DataFrame:
     """Conteo y porcentaje de cada etiqueta por split y variedad."""
     conteo = corpus.groupby(["split", "variedad", "etiqueta"]).size().unstack(fill_value=0)[ETIQUETAS]
@@ -157,10 +133,7 @@ def asociacion_etiqueta_variedad(corpus: pd.DataFrame) -> pd.DataFrame:
 
 
 def baseline_mayoritario(corpus: pd.DataFrame) -> pd.DataFrame:
-    """
-    Piso de referencia: predecir siempre la clase más frecuente del train de esa
-    variedad y medirlo en su dev. Cualquier sistema debe superar esto con holgura.
-    """
+    """Piso de referencia: predecir siempre la clase más frecuente del train de esa"""
     filas = []
     for var, g in corpus.groupby("variedad"):
         tr, dv = g[g.split == "train"], g[g.split == "dev"]
@@ -177,9 +150,6 @@ def baseline_mayoritario(corpus: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(filas)
 
 
-# ----------------------------------------------------------------------------
-# Rasgos del texto
-# ----------------------------------------------------------------------------
 def agregar_rasgos(corpus: pd.DataFrame) -> pd.DataFrame:
     """Agrega columnas con rasgos propios de texto de redes sociales."""
     df = corpus.copy()
@@ -222,12 +192,6 @@ def tabla_rasgos(df: pd.DataFrame, por: str = "variedad") -> pd.DataFrame:
     return pd.DataFrame(out).round(1)
 
 
-# ----------------------------------------------------------------------------
-# Fenómenos lingüísticos (heurísticos)
-# ----------------------------------------------------------------------------
-# OJO: son las mismas heurísticas de scripts/data/audit_phenomena.py. La que ese
-# script llama "sarcasmo_aparente" solo detecta risas ("jaja", "jeje") y algunos
-# emojis, no sarcasmo: aquí se rebautiza "marcador_risa" para no sobrar-interpretar.
 FENOMENOS = {
     "diminutivo_afectivo": "diminutivo (-ito/-ita)",
     "doble_negacion": "2+ negaciones",
@@ -251,11 +215,7 @@ def tabla_fenomenos(df: pd.DataFrame, split: str | None = None) -> pd.DataFrame:
 
 
 def muestra_para_validar(df: pd.DataFrame, n_por_fenomeno: int = 30, seed: int = 42) -> pd.DataFrame:
-    """
-    Muestra anonimizada de tuits marcados por cada heurística, con una columna vacía
-    para que el autor confirme a mano si la marca es correcta. Sirve para estimar la
-    precisión real de las heurísticas antes de apoyarse en ellas.
-    """
+    """Muestra anonimizada de tuits marcados por cada heurística, con una columna vacía"""
     partes = []
     for col, nombre in FENOMENOS.items():
         marcados = df[df[col]]
@@ -267,9 +227,6 @@ def muestra_para_validar(df: pd.DataFrame, n_por_fenomeno: int = 30, seed: int =
     return pd.concat(partes, ignore_index=True)
 
 
-# ----------------------------------------------------------------------------
-# Vocabulario
-# ----------------------------------------------------------------------------
 def tokens(texto: str) -> list[str]:
     limpio = _RE_URL.sub(" ", _RE_MENCION.sub(" ", texto.lower()))
     return [p for p in _RE_PALABRA.findall(limpio) if p not in STOPWORDS]
@@ -286,11 +243,7 @@ def top_terminos_por_etiqueta(df: pd.DataFrame, k: int = 12) -> pd.DataFrame:
 
 
 def vocabulario_distintivo(df: pd.DataFrame, k: int = 10, min_count: int = 8, alpha: float = 0.5) -> pd.DataFrame:
-    """
-    Términos que una variedad usa mucho más que las demás (log-odds suavizado).
-    Sirve para detectar peruanismos/mexicanismos... y también temas de actualidad
-    de cada país, que son un posible factor de confusión entre dialecto y tema.
-    """
+    """Términos que una variedad usa mucho más que las demás (log-odds suavizado)."""
     por_var = {v: pd.Series([t for s in g["texto"] for t in tokens(s)]).value_counts() for v, g in df.groupby("variedad")}
     vocab = sorted(set().union(*[set(c.index) for c in por_var.values()]))
     mat = pd.DataFrame({v: c.reindex(vocab).fillna(0) for v, c in por_var.items()})
@@ -304,9 +257,6 @@ def vocabulario_distintivo(df: pd.DataFrame, k: int = 10, min_count: int = 8, al
     return pd.DataFrame(filas, columns=["variedad", "rank", "termino", "frecuencia", "log_odds"])
 
 
-# ----------------------------------------------------------------------------
-# Fechas (derivadas del id del tuit)
-# ----------------------------------------------------------------------------
 def agregar_fecha(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     ids = pd.to_numeric(out["id"], errors="coerce")
@@ -321,11 +271,7 @@ def tabla_fechas(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def concentracion_temporal(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    ¿Los tuits de cada variedad están repartidos en el tiempo o concentrados en ráfagas?
-    ¿Train y dev cubren las mismas fechas? (ks_D = 0 significa misma distribución de fechas;
-    se reporta D y no el p-valor porque con miles de tuits el p-valor siempre sale ~0.)
-    """
+    """¿Los tuits de cada variedad están repartidos en el tiempo o concentrados en ráfagas?"""
     d = df.assign(semana=df["fecha"].dt.to_period("W").dt.start_time)
     filas = []
     for var, g in d.groupby("variedad"):

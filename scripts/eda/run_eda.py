@@ -1,14 +1,4 @@
-"""
-Genera el EDA completo del corpus: tablas (CSV) y figuras (PNG) en docs/eda/.
-Incluye la segunda etapa (scripts/eda/eda_extra.py): IC, época vs. país, línea base, potencia y casi duplicados.
-
-Uso (desde la raíz del repositorio):
-    python scripts/eda/run_eda.py
-    python scripts/eda/run_eda.py --data-dir data --out-dir docs/eda
-
-No modifica los datos. No entrena ningún modelo. Todas las cifras salen de
-scripts/eda/eda_utils.py, las mismas funciones que usa notebooks/02_eda.ipynb.
-"""
+"""Genera el EDA completo del corpus: tablas (CSV) y figuras (PNG) en docs/eda/."""
 from __future__ import annotations
 
 import argparse
@@ -18,19 +8,19 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 
 sys.path.append(str(Path(__file__).resolve().parent))
-import eda_extra as X  # noqa: E402
-import eda_utils as E  # noqa: E402
+import eda_extra as X
+import eda_utils as E
 
-# --- Estilo: paleta categórica validada (azul, naranja, aqua, amarillo, magenta) ---
+
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e6e5e1"
 COLOR_VAR = {"CR": "#2a78d6", "ES": "#eb6834", "MX": "#1baf7a", "PE": "#eda100", "UY": "#e87ba4"}
-COLOR_ET = {"NEG": "#e34948", "NEU": "#b8b7b0", "POS": "#2a78d6"}  # divergente rojo-gris-azul
+COLOR_ET = {"NEG": "#e34948", "NEU": "#b8b7b0", "POS": "#2a78d6"}
 SEQ = LinearSegmentedColormap.from_list("seq", ["#eef4fc", "#1d4f91"])
 
 plt.rcParams.update({
@@ -238,7 +228,7 @@ def fig_panel_resumen(df: pd.DataFrame, corpus: pd.DataFrame, ruta: Path) -> Non
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     paises = sorted(df["variedad"].unique())
 
-    # (a) etiquetas con IC
+
     ax = axs[0, 0]
     ic = X.ic_etiquetas(df)
     for k, et in enumerate(E.ETIQUETAS):
@@ -253,7 +243,7 @@ def fig_panel_resumen(df: pd.DataFrame, corpus: pd.DataFrame, ruta: Path) -> Non
     ax.legend(ncol=3, loc="upper left")
     ax.set_title("Etiquetas por país: Perú es distinto")
 
-    # (b) piso de desempeño
+
     ax = axs[0, 1]
     may = E.baseline_mayoritario(corpus).set_index("variedad").reindex(paises)
     tf = X.baseline_tfidf(corpus)
@@ -271,7 +261,7 @@ def fig_panel_resumen(df: pd.DataFrame, corpus: pd.DataFrame, ruta: Path) -> Non
     ax.legend(loc="upper left")
     ax.set_title("Pisos de referencia a superar")
 
-    # (c) concentración temporal
+
     ax = axs[1, 0]
     vp = X.ventana_pico(df).set_index("variedad").reindex(paises)
     ax.bar(x, vp["pct_tuits_en_ventana"], color=[COLOR_VAR[v] for v in paises])
@@ -284,7 +274,7 @@ def fig_panel_resumen(df: pd.DataFrame, corpus: pd.DataFrame, ruta: Path) -> Non
     ax.set_axisbelow(True)
     ax.set_title("Concentración temporal (ventana más densa)")
 
-    # (d) potencia
+
     ax = axs[1, 1]
     n = np.arange(300, 2701, 50)
     z = 1.96 + 0.8416
@@ -340,7 +330,7 @@ def main() -> None:
         "top_terminos_por_etiqueta": E.top_terminos_por_etiqueta(df),
         "vocabulario_distintivo": E.vocabulario_distintivo(df),
         "muestra_validar_heuristicas": E.muestra_para_validar(df),
-        # Segunda etapa (eda_extra.py)
+
         "ic_etiquetas": X.ic_etiquetas(df),
         "ic_fenomenos": X.ic_fenomenos(df),
         "etiquetas_por_mes": X.etiquetas_por_mes(df),

@@ -1,5 +1,4 @@
 # Corrida local de Salamandra con Ollama (Windows). Ejecutar desde la raíz del repositorio.
-# Uso: .\scripts\experimento\ollama\correr_ollama.ps1 [-Modo prueba|completa]
 param([string]$Modo = "prueba")
 $Modelo = "salamandra-7b-instruct"
 $Salida = "docs/experimento/llm_ollama"

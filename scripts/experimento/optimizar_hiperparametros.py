@@ -1,19 +1,4 @@
-"""
-Optimización de hiperparámetros del baseline clásico (no del LLM).
-
-Se busca la mejor configuración con validación cruzada de 5 pliegues SOLO sobre train. Dev no se toca durante
-la búsqueda: se usa una única vez al final, para medir la configuración elegida contra la de referencia
-(TF-IDF de palabras 1 a 2, C = 1, que es la del experimento baseline).
-
-Tres familias de modelos:
-  palabras   TF-IDF de palabras  (n-gramas, min_df) + regresión logística (C, class_weight)
-  caracteres TF-IDF de caracteres, digramas y trigramas entre otros   + regresión logística (C, class_weight)
-  numerico   las 24 variables estandarizadas + regresión logística (C, class_weight)
-
-Uso (desde la raíz del repositorio):
-    python scripts/experimento/optimizar_hiperparametros.py
-Salida: docs/hiperparametros/tablas/*.csv
-"""
+"""Optimización de hiperparámetros del baseline clásico (no del LLM)."""
 from __future__ import annotations
 
 import argparse
@@ -33,17 +18,17 @@ from sklearn.preprocessing import StandardScaler
 AQUI = Path(__file__).resolve().parent
 for sub in ("experimento", "features", "eda"):
     sys.path.append(str(AQUI.parent / sub))
-import eda_utils as E  # noqa: E402
-import evaluacion as EV  # noqa: E402
-import feature_utils as F  # noqa: E402
-import variantes_datos as V  # noqa: E402
+import eda_utils as E
+import evaluacion as EV
+import feature_utils as F
+import variantes_datos as V
 
 VALORES_C = [0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0]
 PESOS = ["balanced", None]
 N_PLIEGUES = 5
 SEMILLA = 0
 
-# Espacio de búsqueda: nombre de la familia -> lista de configuraciones del vectorizador
+
 ESPACIO = {
     "palabras": [{"ngram_range": ng, "min_df": md} for ng in [(1, 1), (1, 2), (1, 3)] for md in [1, 2, 3]],
     "caracteres": [{"ngram_range": ng, "min_df": 3} for ng in [(2, 3), (3, 4), (2, 5)]],
@@ -82,10 +67,7 @@ def pliegues(train: pd.DataFrame) -> list[tuple[np.ndarray, np.ndarray]]:
 
 
 def busqueda_cv(train: pd.DataFrame, familias=("palabras", "caracteres", "numerico"), verbose: bool = True) -> pd.DataFrame:
-    """
-    Una fila por configuración: familia, parámetros, Macro-F1 medio de los 5 pliegues y su desviación.
-    El vectorizador y el escalador se ajustan DENTRO de cada pliegue, solo con sus datos de ajuste.
-    """
+    """Una fila por configuración: familia, parámetros, Macro-F1 medio de los 5 pliegues y su desviación."""
     y = train["etiqueta"].to_numpy()
     textos = _textos(train)
     num = F.construir_matriz(train)[F._numericas(F.GRUPOS_NUM)] if "numerico" in familias else None
@@ -94,7 +76,7 @@ def busqueda_cv(train: pd.DataFrame, familias=("palabras", "caracteres", "numeri
     for fam in familias:
         t0 = time.time()
         for cfg in ESPACIO[fam]:
-            # se transforma una vez por pliegue y se reutiliza para todos los (C, peso)
+
             mats = []
             for tr, va in folds:
                 if fam == "numerico":
@@ -142,10 +124,7 @@ def prediccion_referencia(train: pd.DataFrame, dev: pd.DataFrame) -> np.ndarray:
 
 
 def evaluar_en_dev(train: pd.DataFrame, dev: pd.DataFrame, res: pd.DataFrame, n_boot: int = 2000):
-    """
-    Una sola medición en dev: la mejor configuración de cada familia y la de referencia.
-    Devuelve (resultados, diferencias_contra_referencia, predicciones).
-    """
+    """Una sola medición en dev: la mejor configuración de cada familia y la de referencia."""
     y = dev["etiqueta"].to_numpy()
     preds = {"referencia": prediccion_referencia(train, dev)}
     mejores = mejores_por_familia(res)

@@ -1,18 +1,4 @@
-"""
-Variantes de los DATOS de entrada para el experimento.
-
-El experimento compara el mismo sistema (hoy un clasificador de referencia, luego el monoagente con
-Salamandra-7B-Instruct) cambiando SOLO el texto que recibe. Hay una línea base y una variante principal:
-
-- base:   el tuit como lo ve el LLM hoy (`normalizar_para_llm`): @USUARIO, URL, espacios colapsados.
-          Conserva mayúsculas, tildes, alargamientos, emojis y puntuación.
-- limpio: la variante principal. Minúsculas, sin tildes (la ñ se conserva), sin letras alargadas
-          y sin emojis. Mide cuánto del resultado depende de la información de "tono" del texto.
-
-Además hay variantes de un solo cambio, que sirven para saber qué componente de `limpio` pesa.
-Las mismas funciones se usan para el clasificador de referencia y para el LLM, así las variantes
-son idénticas en los dos casos.
-"""
+"""Variantes de los DATOS de entrada para el experimento."""
 from __future__ import annotations
 
 import sys
@@ -22,7 +8,7 @@ from pathlib import Path
 import regex as re
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "features"))
-import feature_utils as F  # noqa: E402
+import feature_utils as F
 
 _ALARGA = re.compile(r"(\p{L})\1{2,}")
 _EMOJI = re.compile(r"[\p{Extended_Pictographic}‍️]")

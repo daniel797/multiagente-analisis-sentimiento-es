@@ -1,24 +1,4 @@
-"""
-Validación cruzada del baseline y dos variantes, elección de la mejor, optimización de sus hiperparámetros y
-ablaciones. Es la base de las cifras del informe parcial.
-
-Todo se ajusta y se valida SOLO con train (5 pliegues estratificados por etiqueta y variedad, semilla 0). Dev
-(2.465 tuits) se mide una única vez al final, con las configuraciones ya elegidas.
-
-Candidatos (baseline + 2 variantes):
-  M0  baseline   TF-IDF de palabras (1,2), min_df 2 + regresión logística (C = 1, clases balanceadas)
-  M1  variante 1 TF-IDF de caracteres (2,5), min_df 3, máx. 60.000 + regresión logística (C = 1, balanceadas)
-  M2  variante 2 TF-IDF de palabras (1,2) + las 24 variables de ingeniería de atributos, regresión logística
-  M3  variante 3 TF-IDF de caracteres (2,5) + las 24 variables de ingeniería de atributos, regresión logística
-Referencias simples (no son candidatos; sirven para ver cuánto aporta cada señal por sí sola):
-  V1  solo las 24 variables (estandarizadas) + regresión logística
-  V2  regla de léxico sin entrenamiento: POS si hay más palabras positivas que negativas, NEG si hay más
-      negativas, NEU en otro caso
-
-Uso (desde la raíz del repositorio):
-    python scripts/experimento/validacion_cruzada.py
-Salida: docs/validacion/tablas/*.csv y docs/validacion/figuras/*.png
-"""
+"""Validación cruzada de las variantes M0 a M3, optimización de M2 y ablaciones (solo train; dev se mide una vez al final)."""
 from __future__ import annotations
 
 import argparse
@@ -32,23 +12,23 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from scipy.sparse import csr_matrix, hstack  # noqa: E402
-from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: E402
-from sklearn.linear_model import LogisticRegression  # noqa: E402
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score  # noqa: E402
-from sklearn.preprocessing import StandardScaler  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from scipy.sparse import csr_matrix, hstack
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
+from sklearn.preprocessing import StandardScaler
 
 AQUI = Path(__file__).resolve().parent
 for sub in ("experimento", "features", "eda"):
     sys.path.append(str(AQUI.parent / sub))
-import evaluacion as EV  # noqa: E402
-import feature_utils as F  # noqa: E402
-import optimizar_hiperparametros as H  # noqa: E402
-import variantes_datos as V  # noqa: E402
-import lexico_es as LX  # noqa: E402
+import evaluacion as EV
+import feature_utils as F
+import optimizar_hiperparametros as H
+import variantes_datos as V
+import lexico_es as LX
 
 CLASES = ["NEG", "NEU", "POS"]
 SEMILLA = 0
@@ -70,9 +50,6 @@ def predecir_regla(df: pd.DataFrame) -> np.ndarray:
     return np.where(pos > neg, "POS", np.where(neg > pos, "NEG", "NEU")).astype(object)
 
 
-# ----------------------------------------------------------------------------------------------------------
-# Representaciones
-# ----------------------------------------------------------------------------------------------------------
 def _lr(c: float = 1.0, peso="balanced") -> LogisticRegression:
     return LogisticRegression(C=c, class_weight=peso, max_iter=3000, random_state=SEMILLA)
 
@@ -102,8 +79,7 @@ class Representacion:
 
     @staticmethod
     def precalcular(*dfs: pd.DataFrame) -> None:
-        """Las 24 variables y los 8 rasgos del léxico ampliado dependen solo del texto de cada tuit (no de las etiquetas):
-        se calculan una vez y se reutilizan en todos los pliegues. El léxico ampliado usa lemas de spaCy (es_core_news_md)."""
+        """Las 24 variables y los 8 rasgos del léxico ampliado dependen solo del texto de cada tuit (no de las etiquetas):"""
         import spacy
         cols = F._numericas(F.GRUPOS_NUM)
         nlp = spacy.load("es_core_news_md", disable=["ner", "parser"])
@@ -141,7 +117,7 @@ def correr_cv(train: pd.DataFrame, rep: Representacion, c: float = 1.0, peso="ba
     filas = []
     for k, (tr, va) in enumerate(pliegues(train), start=1):
         t0 = time.time()
-        if rep.nombre == "V2":   # regla de léxico: no se ajusta nada
+        if rep.nombre == "V2":
             t_ajuste = time.time() - t0
             t1 = time.time()
             p = predecir_regla(train.iloc[va])
@@ -177,7 +153,6 @@ def dif_pareada_oof(y, p_a, p_b, n_boot: int = 2000, seed: int = SEMILLA) -> dic
     return {"dif": d["dif_macro_f1_B_menos_A"], "ic_inf": d["ic_inf"], "ic_sup": d["ic_sup"]}
 
 
-# ----------------------------------------------------------------------------------------------------------
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-dir", default="data")
@@ -194,7 +169,7 @@ def main() -> None:
     y = train["etiqueta"].to_numpy()
     print(f"train={len(train)} dev={len(dev)}")
 
-    # --- Particiones ---------------------------------------------------------------------------------------
+
     fl = pliegues(train)
     part = []
     for k, (tr, va) in enumerate(fl, start=1):
@@ -204,7 +179,7 @@ def main() -> None:
                      **{f"n_{v}": int((d.variedad == v).sum()) for v in sorted(train.variedad.unique())}})
     pd.DataFrame(part).to_csv(T / "particiones.csv", index=False)
 
-    # --- 1. Baseline y variantes (por fold) ----------------------------------------------------------------
+
     res, oof = {}, {}
     for nombre in ("M0", "M1", "M2", "M3", "V1", "V2"):
         r = correr_cv(train, Representacion(nombre))
@@ -235,7 +210,7 @@ def main() -> None:
     with open(T / "modelo_elegido.txt", "w") as fh:
         fh.write(elegido + "\n")
 
-    # --- Por clase y por variedad (OOF) --------------------------------------------------------------------
+
     filas = []
     for n in ("M0", "M1", "M2", "M3", "V1", "V2"):
         for v in ["Todas"] + sorted(train.variedad.unique()):
@@ -246,10 +221,10 @@ def main() -> None:
     cm = pd.DataFrame(confusion_matrix(y, oof[elegido], labels=CLASES), index=[f"real_{c}" for c in CLASES], columns=[f"pred_{c}" for c in CLASES])
     cm.to_csv(T / "cv_matriz_confusion_elegido.csv")
 
-    # --- 2. Optimización de hiperparámetros del modelo elegido --------------------------------------------
+
     if elegido not in ("M0", "M2", "M3"):
         sys.exit(f"El elegido es {elegido}: la búsqueda implementada es la de M0, M2 o M3.")
-    if elegido in ("M2", "M3"):   # con caracteres: malla propia con la misma estructura que la de H.busqueda_cv
+    if elegido in ("M2", "M3"):
         filas_b = []
         for ng in [(2, 3), (3, 4), (2, 5)]:
             for c_, p_ in itertools.product(H.VALORES_C, H.PESOS):
@@ -267,7 +242,7 @@ def main() -> None:
     c_best = float(mejor["C"])
     if elegido in ("M2", "M3"):
         cfg = {"ngram": eval(mejor["ngram_range"]), "min_df": int(mejor["min_df"]), "analyzer": "char_wb", "max_features": 60000}
-        # Etapa 2: refinamiento alrededor del mejor punto (tipo de n-grama, tamaño del vocabulario y min_df)
+
         ref = []
         for analyzer, mf, md in [("char_wb", 60000, 3), ("char_wb", 20000, 3), ("char_wb", None, 3), ("char", 60000, 3), ("char", 20000, 3), ("char", None, 3), ("char_wb", 60000, 2), ("char_wb", 60000, 5)]:
             c2 = {**cfg, "analyzer": analyzer, "max_features": mf, "min_df": md}
@@ -308,14 +283,14 @@ def main() -> None:
         "dif_contra_por_defecto": round(d["dif"], 4), "ic_inf": round(d["ic_inf"], 4), "ic_sup": round(d["ic_sup"], 4),
         "folds_a_favor": int((porf > 0).sum()), "seg_ajuste_por_fold": round(r_opt["folds"]["seg_ajuste"].mean(), 2),
     }]).to_csv(T / "optimizacion_resultado_cv.csv", index=False)
-    # efecto marginal de cada hiperparámetro (mejor valor alcanzable con ese valor)
+
     marg = []
     for col in ("C", "class_weight", "ngram_range", "min_df"):
         for val, g in busq.groupby(col):
             marg.append({"hiperparametro": col, "valor": val, "mejor_macro_f1_cv": round(g.macro_f1_cv.max(), 4)})
     pd.DataFrame(marg).to_csv(T / "optimizacion_efecto_marginal.csv", index=False)
 
-    # --- 3. Ablaciones (por fold, con el modelo elegido) --------------------------------------------------
+
     ab = []
     def registrar(componente, control, nombre_cfg, folds_cfg, oof_cfg, folds_ctrl, oof_ctrl):
         dd = dif_pareada_oof(y, oof_ctrl, oof_cfg, a.n_boot)
@@ -326,13 +301,13 @@ def main() -> None:
                    "media": round(m, 4), "desv": round(s, 4), "dif_contra_control": round(dd["dif"], 4), "ic_inf": round(dd["ic_inf"], 4),
                    "ic_sup": round(dd["ic_sup"], 4), "folds_a_favor": int((porf > 0).sum())})
 
-    # 3a. variantes de los datos (modelo elegido, hiperparámetros por defecto)
+
     ctrl_f, ctrl_o = res[elegido], oof[elegido]
     for var in ["limpio", "minusculas", "sin_tildes", "sin_alargamientos", "sin_emojis", "sin_usuario_url"]:
         r = correr_cv(train, Representacion(elegido, variante_texto=var))
         registrar("Texto de entrada", "base", var, r["folds"], r["oof"], ctrl_f, ctrl_o)
         print("variante de datos", var, "%.4f" % resumen(r["folds"])[0])
-    # 3b. grupos de variables en M2 (palabras + 24 variables)
+
     for mm in ("M3",):
         for g in tuple(F.GRUPOS_NUM) + ("lexico_amplio",):
             r = correr_cv(train, Representacion(mm, excluir_grupos=(g,)))
@@ -341,24 +316,24 @@ def main() -> None:
         registrar(f"Grupo de variables (en {mm})", f"{mm} completo", f"{mm} sin las 24 variables (queda el léxico ampliado)", r["folds"], r["oof"], res[mm], oof[mm])
         r = correr_cv(train, Representacion(mm, excluir_grupos=tuple(F.GRUPOS_NUM) + ("lexico_amplio",)))
         registrar(f"Grupo de variables (en {mm})", f"{mm} completo", f"{mm} sin ninguna variable (solo texto)", r["folds"], r["oof"], res[mm], oof[mm])
-    # 3b2. el léxico ampliado en M1 y M2 (se quita y queda el texto solo)
+
     for mm in ("M1", "M2"):
         r = correr_cv(train, Representacion(mm, excluir_grupos=("lexico_amplio",)))
         registrar("Léxico ampliado", f"{mm} completo", f"{mm} sin léxico ampliado", r["folds"], r["oof"], res[mm], oof[mm])
-    # 3c. solo un grupo de variables (modelo de 24 variables)
+
     for g in F.GRUPOS_NUM:
         r = correr_cv(train, Representacion("V1", excluir_grupos=tuple(x for x in F.GRUPOS_NUM if x != g)))
         registrar("Solo un grupo (modelo de variables)", "V1: 24 variables", f"solo {g}", r["folds"], r["oof"], res["V1"], oof["V1"])
     r = correr_cv(train, Representacion("V3"))
     registrar("Solo un grupo (modelo de variables)", "V1: 24 variables", "solo lexico_amplio", r["folds"], r["oof"], res["V1"], oof["V1"])
-    # 3d. peso de clases en el modelo elegido
+
     r = correr_cv(train, Representacion(elegido), peso=None)
     registrar("Peso de clases", "balanceado", "sin balancear", r["folds"], r["oof"], ctrl_f, ctrl_o)
-    # 3e. hiperparámetros optimizados contra los de defecto
+
     registrar("Hiperparámetros", "por defecto", "optimizados", res["opt"], oof["opt"], ctrl_f, ctrl_o)
     pd.DataFrame(ab).to_csv(T / "ablaciones_cv.csv", index=False)
 
-    # --- 4. Curva de aprendizaje del modelo optimizado ---------------------------------------------------
+
     rng = np.random.default_rng(SEMILLA)
     filas = []
     for frac in (0.2, 0.4, 0.6, 0.8, 1.0):
@@ -372,7 +347,7 @@ def main() -> None:
         filas.append({"fraccion_train": frac, "n_ajuste_aprox": int(len(train) * 0.8 * frac), "macro_f1_ajuste": round(np.mean(vt), 4), "macro_f1_valid": round(np.mean(vv), 4), "desv_valid": round(np.std(vv, ddof=1), 4)})
     pd.DataFrame(filas).to_csv(T / "curva_aprendizaje.csv", index=False)
 
-    # --- 5. Medición única en dev -------------------------------------------------------------------------
+
     yd = dev["etiqueta"].to_numpy()
     preds = {}
     preds["V2"] = predecir_regla(dev)
@@ -383,7 +358,7 @@ def main() -> None:
         m = _lr(c, p_).fit(Xtr, y)
         preds[n] = m.predict(Xdv)
         preds[n + "_seg"] = time.time() - t0
-    # Salamandra monoagente (B1), mismos tuits de dev
+
     llm = pd.read_csv(AQUI.parents[1] / "docs/experimento/llm/predicciones_llm.csv", dtype=str, keep_default_na=False)
     llm = llm[llm.variante == "base"].drop_duplicates("id").set_index("id")
     pl = llm["pred"].where(llm["pred"].isin(CLASES), "NEU")
@@ -411,7 +386,7 @@ def main() -> None:
         f1c.append({"modelo": nombres[n], **{f"F1_{c}": round(v, 4) for c, v in zip(CLASES, f)}})
     pd.DataFrame(f1c).to_csv(T / "dev_f1_por_clase.csv", index=False)
 
-    # --- 6. Registro de corridas (Anexo D) ----------------------------------------------------------------
+
     h = hashlib.sha1()
     for p in sorted(Path(a.data_dir).glob("*/*.tsv")):
         h.update(p.read_bytes())
@@ -425,7 +400,7 @@ def main() -> None:
         reg.append({"run_id": f"cv-{n}", "commit": commit, "datos_sha1": h.hexdigest()[:10], "seed_split": f"semilla {SEMILLA} · 5 pliegues estratificados (etiqueta, variedad)", "metrica": f"Macro-F1 CV {m:.4f}", "artefacto": "docs/validacion/tablas/cv_por_fold_baseline_variantes.csv" if n in MODELOS else "docs/validacion/tablas/optimizacion_resultado_cv.csv"})
     pd.DataFrame(reg).to_csv(T / "registro_corridas.csv", index=False)
 
-    # --- Figuras ----------------------------------------------------------------------------------------
+
     fig, ax = plt.subplots(figsize=(7.5, 3.8))
     ancho = 0.16
     for i, (n, col) in enumerate((("M0", GRIS), ("M1", AZUL), ("M2", VERDE), ("M3", "#e0a030"), ("opt", ROJO))):

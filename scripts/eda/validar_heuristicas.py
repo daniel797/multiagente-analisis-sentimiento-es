@@ -1,17 +1,4 @@
-"""
-Calcula la precisión de las heurísticas de fenómenos a partir de la muestra anotada a mano.
-
-Pasos:
-  1. Abrir docs/eda/tablas/muestra_validar_heuristicas.csv (Excel o similar).
-  2. En la columna "es_correcto (SI/NO)" escribir SI si la marca es correcta (el tuit sí tiene el
-     fenómeno) y NO si no lo es. Guardar como CSV (UTF-8).
-  3. Correr:
-        python scripts/eda/validar_heuristicas.py
-     o con otra ruta:
-        python scripts/eda/validar_heuristicas.py --input mi_muestra.csv
-
-Salida: docs/eda/tablas/precision_heuristicas.csv y un resumen por pantalla.
-"""
+"""Calcula la precisión de las heurísticas de fenómenos a partir de la muestra anotada a mano."""
 from __future__ import annotations
 
 import argparse
@@ -21,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parent))
-import eda_extra as X  # noqa: E402
+import eda_extra as X
 
 
 def main() -> None:

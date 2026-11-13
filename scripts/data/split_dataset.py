@@ -1,22 +1,4 @@
-"""
-Genera la partición de desarrollo / validación / prueba bloqueada, estratificada por
-variedad dialectal y por etiqueta, para evitar que el conjunto de prueba se use por
-error durante el diseño de los prompts o la selección del umbral de confianza.
-
-Protocolo (documentado en el avance de la Semana 2):
-    - desarrollo: se usa para analizar errores del monoagente y diseñar los prompts
-      de los agentes especializados.
-    - validación: se usa para fijar el umbral de confianza (tau) y max_iter del
-      meta-agente.
-    - prueba: queda bloqueada y solo se usa una vez, para la evaluación final de
-      todas las condiciones (B1, B3, B4, B5, B6).
-
-Uso:
-    python scripts/data/split_dataset.py \
-        --input data/processed/tass2020_consolidado.csv \
-        --out-dir data/processed \
-        --seed 42
-"""
+"""Genera la partición de desarrollo / validación / prueba bloqueada, estratificada por"""
 from __future__ import annotations
 
 import argparse
@@ -26,13 +8,13 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from scripts.utils.io_utils import get_logger, read_table_any, write_csv  # noqa: E402
+from scripts.utils.io_utils import get_logger, read_table_any, write_csv
 
 logger = get_logger("split_dataset")
 
 DEV_SIZE = 0.60
 VAL_SIZE = 0.15
-TEST_SIZE = 0.25  # dev + val + test = 1.0
+TEST_SIZE = 0.25
 
 
 def main() -> None:
@@ -45,8 +27,7 @@ def main() -> None:
     df = read_table_any(args.input)
     df = df.dropna(subset=["etiqueta"]).reset_index(drop=True)
 
-    # Estrato combinado: variedad + etiqueta, para que cada partición mantenga
-    # proporciones similares de país y de polaridad.
+
     estrato = df["variedad"].astype(str) + "_" + df["etiqueta"].astype(str)
 
     dev, resto = train_test_split(

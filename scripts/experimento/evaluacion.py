@@ -1,10 +1,4 @@
-"""
-Evaluación común del experimento: Macro-F1 con intervalo por bootstrap, por variedad y en conjunto,
-y diferencia pareada entre una variante y la línea base (mismos tuits).
-
-La usan el baseline clásico (run_baseline_variantes.py) y el monoagente con LLM
-(monoagente_salamandra.py), así las cifras de los dos son comparables.
-"""
+"""Evaluación común del experimento: Macro-F1 con intervalo por bootstrap, por variedad y en conjunto,"""
 from __future__ import annotations
 
 import sys
@@ -15,7 +9,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "features"))
-import feature_utils as F  # noqa: E402
+import feature_utils as F
 
 
 def metricas(y, p, n_boot: int = 2000, seed: int = 0) -> dict:

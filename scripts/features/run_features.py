@@ -1,14 +1,4 @@
-"""
-Genera el análisis de Feature Engineering: tablas (CSV) y figuras (PNG) en docs/features/.
-
-Uso (desde la raíz del repositorio):
-    python scripts/features/run_features.py
-    python scripts/features/run_features.py --data-dir data --out-dir docs/features
-
-No modifica los datos. No entrena el modelo del proyecto: los modelos de regresión logística de este
-script son solo líneas base de referencia, ajustadas con train y medidas en dev.
-Usa las mismas funciones que notebooks/03_feature_engineering.ipynb.
-"""
+"""Genera el análisis de Feature Engineering: tablas (CSV) y figuras (PNG) en docs/features/."""
 from __future__ import annotations
 
 import argparse
@@ -18,15 +8,15 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parents[1] / "eda"))
-import eda_utils as E  # noqa: E402
-import feature_utils as F  # noqa: E402
-import run_eda as R  # noqa: E402  (reutiliza el estilo gráfico y los helpers de guardado)
+import eda_utils as E
+import feature_utils as F
+import run_eda as R
 
 COLOR_GRUPO = {"estructural": "#2a78d6", "expresividad": "#eb6834", "conversacional": "#1baf7a", "fenomeno": "#e87ba4", "lexico": "#eda100"}
 
@@ -197,6 +187,10 @@ def main() -> None:
     dif = F.diferencias_pareadas(y_dev, rep.predecir(), [("pal", "car"), ("pal", "pal+car"), ("pal", "pal+num"), ("car", "pal+car"), ("num", "pal"), ("num", "pal+num")])
     abl = F.ablacion_por_grupo(corpus)
     imp = F.importancia_permutacion(corpus)
+    imp_clase = F.importancia_por_clase(corpus)
+    coefs = F.coeficientes_estandarizados(corpus)
+    imp_bloques = F.importancia_en_bloques(corpus)
+    imp_var = F.importancia_por_variedad(corpus)
     est = F.estabilidad_features(corpus)
     rob = F.robustez_modelos(corpus)
     aso = F.asociacion_univariada(M, corpus["etiqueta"], corpus["variedad"])
@@ -214,6 +208,10 @@ def main() -> None:
         "diferencias_pareadas": dif,
         "ablacion_por_grupo": abl,
         "importancia_permutacion": imp,
+        "importancia_por_clase": imp_clase,
+        "coeficientes_estandarizados": coefs,
+        "importancia_en_bloques": imp_bloques,
+        "importancia_por_variedad": imp_var,
         "estabilidad_features": est,
         "robustez_modelos": rob,
         "mapa_features_agentes": F.mapa_features_agentes(),

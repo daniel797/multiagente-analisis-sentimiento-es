@@ -1,45 +1,4 @@
-"""
-Condición B1 (monoagente) con Salamandra-7B-Instruct, repetida para cada variante de los datos.
-
-ESTADO: el código de este archivo se probó con un backend de reglas (`--backend stub`) para verificar
-el flujo completo (prompt, lectura de la salida, reintentos, reanudación, evaluación). NO se ejecutó
-con el modelo real, porque el entorno donde se escribió no tiene GPU ni acceso a Hugging Face. La
-primera corrida con el modelo real debe hacerse con `--limite 50` para revisar a mano las salidas.
-
-Qué hace
-  1. Lee data/<split>/<variedad>.tsv (por defecto el split `dev`).
-  2. Para cada variante de los datos (base, limpio, ...), arma un prompt zero-shot con el tuit
-     transformado y le pide al modelo un JSON {"label": "POS" | "NEG" | "NEU"}.
-  3. Guarda cada predicción en un CSV apenas la obtiene, y al reanudar salta lo ya hecho
-     (útil en Colab, donde la sesión puede cortarse).
-  4. `resumir` calcula Macro-F1 por variedad con intervalo y la diferencia pareada contra la base.
-
-El modelo se usa tal como se publica, sin fine-tuning. Los parámetros salen de configs/model_config.yaml.
-Al monoagente no se le dice la variedad del tuit.
-
-Uso (desde la raíz del repositorio)
-    # prueba del flujo sin modelo
-    python scripts/experimento/monoagente_salamandra.py ejecutar --backend stub --limite 40 --out docs/experimento/prueba_stub
-    # corrida real (GPU), primero una muestra pequeña
-    python scripts/experimento/monoagente_salamandra.py ejecutar --variantes base limpio --limite 50 --out docs/experimento/llm
-    # corrida completa y resumen
-    python scripts/experimento/monoagente_salamandra.py ejecutar --variantes base limpio --out docs/experimento/llm
-    python scripts/experimento/monoagente_salamandra.py resumir --out docs/experimento/llm
-
-    # corrida local con Ollama (modelo GGUF ya descargado; ver --ollama-modelo)
-    python scripts/experimento/monoagente_salamandra.py ejecutar --backend ollama --ollama-modelo salamandra-7b-instruct \
-        --semilla 42 --variantes base limpio --limite 50 --out docs/experimento/llm_ollama
-
-Dependencias del modelo real: torch, transformers, accelerate, bitsandbytes (backend transformers) o solo
-`requests` y un servidor Ollama en marcha (backend ollama).
-
-Corrida con Ollama: la llamada va a /api/chat con la plantilla de chat del propio modelo (Modelfile), los
-parámetros (temperature, top_p, top_k, seed, num_ctx, num_predict) por llamada y, por defecto, salida
-restringida a un esquema JSON con la etiqueta en {POS, NEG, NEU}. Además de las predicciones se guardan los
-tokens y el tiempo de cada llamada y un archivo `registro_corrida.json` con la versión de Ollama, el digest del
-modelo, la cuantización y todos los parámetros. Antes de usarla en serio, comprobar que la plantilla del
-Modelfile produce el mismo prompt que la de Hugging Face (ver `--mostrar-prompt`).
-"""
+"""Condición B1 (monoagente) con Salamandra-7B-Instruct, repetida para cada variante de los datos."""
 from __future__ import annotations
 
 import argparse
@@ -55,10 +14,10 @@ AQUI = Path(__file__).resolve().parent
 sys.path.append(str(AQUI))
 sys.path.append(str(AQUI.parents[0] / "eda"))
 sys.path.append(str(AQUI.parents[0] / "features"))
-import eda_utils as E  # noqa: E402
-import evaluacion as EV  # noqa: E402
-import feature_utils as F  # noqa: E402
-import variantes_datos as V  # noqa: E402
+import eda_utils as E
+import evaluacion as EV
+import feature_utils as F
+import variantes_datos as V
 
 ETIQUETAS = ["POS", "NEG", "NEU"]
 VERSION_PROMPT = "B1-v1"
@@ -97,13 +56,10 @@ def leer_etiqueta(salida: str) -> str | None:
     return sueltas[0] if sueltas else None
 
 
-# ----------------------------------------------------------------------------
-# Backends
-# ----------------------------------------------------------------------------
 class BackendStub:
     """Backend de reglas para probar el flujo sin modelo. NO es un clasificador serio."""
 
-    def generar(self, lotes: list[list[dict]], temperatura: float, semilla: int, **_) -> list[str]:  # acepta top_p y top_k y los ignora
+    def generar(self, lotes: list[list[dict]], temperatura: float, semilla: int, **_) -> list[str]:
         salidas = []
         for mensajes in lotes:
             texto = mensajes[-1]["content"].lower()
@@ -148,10 +104,7 @@ class BackendTransformers:
 
 
 class BackendOllama:
-    """Salamandra servida por Ollama (GGUF). Parámetros por llamada y semilla controlable.
-
-    Las llamadas son secuenciales. Guarda en `self.stats` los tokens y tiempos de la última tanda.
-    """
+    """Salamandra servida por Ollama (GGUF). Parámetros por llamada y semilla controlable."""
 
     ESQUEMA = {"type": "object", "properties": {"label": {"type": "string", "enum": ETIQUETAS}}, "required": ["label"]}
 
@@ -190,9 +143,6 @@ class BackendOllama:
         return salidas
 
 
-# ----------------------------------------------------------------------------
-# Ejecución
-# ----------------------------------------------------------------------------
 def cargar_config(ruta: str = "configs/model_config.yaml") -> dict:
     with open(ruta, encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -263,7 +213,7 @@ def ejecutar(a: argparse.Namespace) -> None:
                 "variante": variante, "version_prompt": VERSION_PROMPT, "pred": [r["pred"] or "" for r in res],
                 "intentos": [r["intentos"] for r in res], "salida_cruda": [r["salida_cruda"].replace("\n", " ")[:200] for r in res],
             })
-            if a.backend == "ollama":   # tokens y tiempo de la última llamada de cada tuit (los reintentos sobrescriben)
+            if a.backend == "ollama":
                 est = pd.DataFrame(backend.stats)
                 if len(est) == len(filas):
                     filas["tokens_prompt"], filas["tokens_salida"], filas["ms_total"] = est["tokens_prompt"].astype(int).values, est["tokens_salida"].astype(int).values, est["ms_total"].values
@@ -279,7 +229,7 @@ def resumir(a: argparse.Namespace) -> None:
     if "base" not in set(pred["variante"]):
         sys.exit("Falta la variante `base` en las predicciones: se necesita para las diferencias pareadas.")
     pred["valida"] = pred["pred"].isin(ETIQUETAS)
-    # Una salida que no se entendió cuenta como NEU, y la tasa de salidas inválidas se reporta aparte.
+
     pred["pred_ok"] = pred["pred"].where(pred["valida"], "NEU")
 
     ancho = {v: g.set_index("id") for v, g in pred.groupby("variante")}

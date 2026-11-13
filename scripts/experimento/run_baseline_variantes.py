@@ -1,20 +1,4 @@
-"""
-Experimento de baseline clásico con variantes de los datos.
-
-Compara, con el mismo modelo y los mismos tuits de dev, la línea base (el tuit como lo ve el LLM)
-contra la variante `limpio` (minúsculas, sin tildes, sin alargamientos, sin emojis) y contra cada
-componente por separado. El modelo es TF-IDF de palabras (1 a 2) + regresión logística, ajustado SOLO
-con train y medido SOLO en dev. No se ajusta ningún hiperparámetro.
-
-Esto NO es el experimento del proyecto (que usa un LLM sin entrenar). Es el piso clásico, y fija el
-protocolo de variantes que después se repite con Salamandra-7B-Instruct (monoagente_salamandra.py).
-
-Uso (desde la raíz del repositorio):
-    python scripts/experimento/run_baseline_variantes.py
-    python scripts/experimento/run_baseline_variantes.py --data-dir data --out-dir docs/experimento
-
-Salida: docs/experimento/tablas/*.csv y docs/experimento/figuras/*.png
-"""
+"""Experimento de baseline clásico con variantes de los datos."""
 from __future__ import annotations
 
 import argparse
@@ -24,20 +8,20 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import regex as re  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import regex as re
 
 AQUI = Path(__file__).resolve().parent
 sys.path.append(str(AQUI))
 sys.path.append(str(AQUI.parents[0] / "features"))
 sys.path.append(str(AQUI.parents[0] / "eda"))
-import eda_utils as E  # noqa: E402
-import evaluacion as EV  # noqa: E402
-import feature_utils as F  # noqa: E402
-import run_eda as R  # noqa: E402
-import variantes_datos as V  # noqa: E402
+import eda_utils as E
+import evaluacion as EV
+import feature_utils as F
+import run_eda as R
+import variantes_datos as V
 
 GRIS = "#b8b7b0"
 AZUL = "#2a78d6"

@@ -1,33 +1,4 @@
-"""
-Consolida los archivos crudos de TASS 2020 (uno por variedad dialectal) en un único
-archivo tabular con columnas estandarizadas: id, texto, variedad, etiqueta.
-
-Este script NO descarga el corpus: el corpus se obtiene aparte, con registro y
-licencia, en tass.sepln.org (ver README.md). Lo que hace es tomar lo que el
-usuario ya descargó y colocó en data/raw/<VARIEDAD>/ y dejarlo en un formato
-único y predecible para los scripts siguientes.
-
-Uso:
-    python scripts/data/consolidate_dataset.py \
-        --raw-dir data/raw \
-        --out data/processed/tass2020_consolidado.csv
-
-Estructura esperada de entrada (ejemplo):
-    data/raw/
-        PE/  archivo(s) .xml o .tsv de InterTASS PE-Perú
-        MX/  archivo(s) .xml o .tsv de la variante MX
-        ES/  ...
-        CL/  ...
-        CR/  ...
-        UY/  ...
-
-Nota sobre el esquema de etiquetas: ediciones previas de InterTASS usan
-P / N / NEU / NONE; TASS 2020 documenta un esquema de tres clases donde NEU
-incorpora los textos sin polaridad clara. Este script normaliza ambos casos
-a {POS, NEG, NEU} y dejan constancia del mapeo aplicado en los logs, para que
-quede documentado qué transformación se usó (correction del plan: fijar el
-esquema de etiquetas exactamente).
-"""
+"""Consolida los archivos crudos de TASS 2020 (uno por variedad dialectal) en un único"""
 from __future__ import annotations
 
 import argparse
@@ -38,17 +9,16 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from scripts.utils.io_utils import get_logger, read_table_any, write_csv  # noqa: E402
+from scripts.utils.io_utils import get_logger, read_table_any, write_csv
 
 logger = get_logger("consolidate_dataset")
 
-# Mapeo de esquemas de etiquetas antiguos al esquema de tres clases usado en este proyecto.
-# Ajustar aquí si la versión descargada trae otro esquema; dejar el cambio documentado.
+
 LABEL_MAP = {
     "P": "POS", "POS": "POS", "POSITIVE": "POS",
     "N": "NEG", "NEG": "NEG", "NEGATIVE": "NEG",
     "NEU": "NEU", "NEUTRAL": "NEU",
-    "NONE": "NEU",  # NONE se incorpora a NEU, siguiendo el esquema de tres clases de TASS 2020
+    "NONE": "NEU",
 }
 
 
@@ -78,8 +48,8 @@ def load_variety_folder(folder: Path, variedad: str) -> pd.DataFrame:
             df = parse_xml_tweets(file)
         elif file.suffix.lower() in (".tsv", ".csv", ".xlsx", ".xls"):
             df = read_table_any(file)
-            # Se esperan columnas 'id'/'tweetid', 'texto'/'content' y 'etiqueta'/'polarity' bajo
-            # distintos nombres según la fuente; se normalizan los más comunes.
+
+
             rename_map = {
                 "tweetid": "id", "content": "texto", "text": "texto",
                 "polarity": "etiqueta_raw", "label": "etiqueta_raw", "sentiment": "etiqueta_raw",

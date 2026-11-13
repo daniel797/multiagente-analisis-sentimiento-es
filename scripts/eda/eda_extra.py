@@ -1,18 +1,4 @@
-"""
-Análisis adicionales del EDA (segunda etapa).
-
-Complementa a eda_utils.py con lo que hace los hallazgos más defendibles:
-
-- Intervalos de confianza para etiquetas y fenómenos.
-- Separar el efecto de la época del efecto del país.
-- Una línea base real (TF-IDF + regresión logística), solo como piso de referencia.
-- Potencia estadística: qué diferencias se pueden detectar con estos tamaños.
-- Textos casi duplicados (no solo idénticos), dentro y entre train/dev.
-- Precisión de las heurísticas de fenómenos, una vez anotada la muestra a mano.
-
-Nada de esto forma parte del experimento principal (monoagente vs. multiagente):
-el clasificador TF-IDF solo se usa aquí para tener un piso más exigente que "la clase mayoritaria".
-"""
+"""Análisis adicionales del EDA (segunda etapa)."""
 from __future__ import annotations
 
 import re
@@ -31,9 +17,6 @@ _RE_MENCION = re.compile(r"@\w+")
 _RE_URL = re.compile(r"https?://\S+|www\.\S+")
 
 
-# ----------------------------------------------------------------------------
-# Intervalos de confianza
-# ----------------------------------------------------------------------------
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     """Intervalo de Wilson para una proporción (mejor que el normal con n pequeño)."""
     if n == 0:
@@ -69,9 +52,6 @@ def ic_fenomenos(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(filas)
 
 
-# ----------------------------------------------------------------------------
-# Época vs. país
-# ----------------------------------------------------------------------------
 def etiquetas_por_mes(df: pd.DataFrame, n_min: int = 50) -> pd.DataFrame:
     """Distribución de etiquetas por variedad y mes (solo celdas con al menos n_min tuits)."""
     d = df.assign(mes=df["fecha"].dt.to_period("M").astype(str))
@@ -83,11 +63,7 @@ def etiquetas_por_mes(df: pd.DataFrame, n_min: int = 50) -> pd.DataFrame:
 
 
 def comparacion_misma_ventana(df: pd.DataFrame, n_min: int = 100) -> pd.DataFrame:
-    """
-    Compara etiquetas entre países DENTRO del mismo mes, así la época queda fija.
-    Si Perú sigue siendo distinto cuando todos los países se miran en el mismo mes,
-    la diferencia no se explica solo por la fecha.
-    """
+    """Compara etiquetas entre países DENTRO del mismo mes, así la época queda fija."""
     d = df.assign(mes=df["fecha"].dt.to_period("M").astype(str))
     filas = []
     for mes, g in d.groupby("mes"):
@@ -108,10 +84,7 @@ def comparacion_misma_ventana(df: pd.DataFrame, n_min: int = 100) -> pd.DataFram
 
 
 def ventana_pico(df: pd.DataFrame, dias: int = 14) -> pd.DataFrame:
-    """
-    Para cada variedad: ventana de `dias` días con más tuits, qué fracción concentra,
-    y si la distribución de etiquetas dentro de la ventana difiere del resto (chi-cuadrado).
-    """
+    """Para cada variedad: ventana de `dias` días con más tuits, qué fracción concentra,"""
     filas = []
     for var, g in df.groupby("variedad"):
         g = g.dropna(subset=["fecha"]).copy()
@@ -135,9 +108,6 @@ def ventana_pico(df: pd.DataFrame, dias: int = 14) -> pd.DataFrame:
     return pd.DataFrame(filas).round(4)
 
 
-# ----------------------------------------------------------------------------
-# Línea base real (solo como piso de referencia)
-# ----------------------------------------------------------------------------
 def _preparar(texto: str) -> str:
     return _RE_URL.sub(" URL ", _RE_MENCION.sub(" USUARIO ", texto))
 
@@ -159,12 +129,7 @@ def _ic_macro_f1(y, pred, n_boot: int = 500, seed: int = 0) -> tuple[float, floa
 
 
 def baseline_tfidf(corpus: pd.DataFrame) -> pd.DataFrame:
-    """
-    Piso de referencia más exigente que la clase mayoritaria: TF-IDF + regresión logística.
-    Se entrena SOLO con el train y se mide SOLO en el dev, de dos formas:
-    un modelo por variedad y un modelo conjunto con todas las variedades.
-    Es una referencia del EDA, no parte del experimento (donde no se entrena nada).
-    """
+    """Piso de referencia más exigente que la clase mayoritaria: TF-IDF + regresión logística."""
     t = corpus.assign(_x=corpus["texto"].map(_preparar))
     tr_all, dv_all = t[t.split == "train"], t[t.split == "dev"]
 
@@ -189,16 +154,8 @@ def baseline_tfidf(corpus: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(filas).round(4)
 
 
-# ----------------------------------------------------------------------------
-# Potencia estadística
-# ----------------------------------------------------------------------------
 def potencia_minima(corpus: pd.DataFrame, discordancias=(0.10, 0.20, 0.30), alfa: float = 0.05, potencia: float = 0.80) -> pd.DataFrame:
-    """
-    Con un diseño pareado (los dos sistemas clasifican los mismos tuits), la diferencia mínima de
-    Accuracy que se puede detectar es  (z_alfa/2 + z_potencia) * sqrt(d / n),  donde d es la
-    proporción de tuits en los que los dos sistemas discrepan. d no se conoce todavía, por eso
-    se muestran varios valores. Es una aproximación en Accuracy, no en Macro-F1.
-    """
+    """Con un diseño pareado (los dos sistemas clasifican los mismos tuits), la diferencia mínima de"""
     z = norm.ppf(1 - alfa / 2) + norm.ppf(potencia)
     n_dev = corpus[corpus.split == "dev"].groupby("variedad").size()
     filas = []
@@ -212,19 +169,13 @@ def potencia_minima(corpus: pd.DataFrame, discordancias=(0.10, 0.20, 0.30), alfa
     return pd.DataFrame(filas).round(2)
 
 
-# ----------------------------------------------------------------------------
-# Textos casi duplicados
-# ----------------------------------------------------------------------------
 def _limpiar(texto: str) -> str:
     t = _RE_URL.sub(" ", _RE_MENCION.sub(" ", texto.lower()))
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", t)).strip()
 
 
 def casi_duplicados(corpus: pd.DataFrame, umbral: float = 0.80, bloque: int = 1000) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Pares de tuits con similitud coseno >= umbral (TF-IDF de palabras y bigramas).
-    Devuelve (resumen, pares). Interesan sobre todo los pares train-dev: son fuga entre particiones.
-    """
+    """Pares de tuits con similitud coseno >= umbral (TF-IDF de palabras y bigramas)."""
     c = corpus.reset_index(drop=True)
     X = TfidfVectorizer(ngram_range=(1, 2), min_df=1).fit_transform(c["texto"].map(_limpiar))
     pares = []
@@ -232,7 +183,7 @@ def casi_duplicados(corpus: pd.DataFrame, umbral: float = 0.80, bloque: int = 10
         S = (X[ini:ini + bloque] @ X.T).toarray()
         filas = np.arange(ini, min(ini + bloque, X.shape[0]))
         for k, i in enumerate(filas):
-            S[k, : i + 1] = 0  # solo la mitad superior, sin la diagonal
+            S[k, : i + 1] = 0
         ii, jj = np.nonzero(S >= umbral)
         pares += [(filas[a], b, S[a, b]) for a, b in zip(ii, jj)]
     p = pd.DataFrame(pares, columns=["i", "j", "similitud"])
@@ -257,9 +208,6 @@ def casi_duplicados(corpus: pd.DataFrame, umbral: float = 0.80, bloque: int = 10
     return resumen, pares_out
 
 
-# ----------------------------------------------------------------------------
-# Validación de heurísticas (cuando la muestra ya fue anotada a mano)
-# ----------------------------------------------------------------------------
 COL_VALIDACION = "es_correcto (SI/NO)"
 
 

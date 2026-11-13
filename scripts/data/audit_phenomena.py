@@ -1,24 +1,4 @@
-"""
-Auditoría previa del corpus: cuenta, con heurísticas simples (no con un modelo),
-cuántos tuits del conjunto de desarrollo contienen indicios de los cuatro fenómenos
-lingüísticos que motivan la especialización del agente de Percepción:
-
-    - diminutivo afectivo (terminaciones -ito/-ita/-itos/-itas)
-    - doble negación (dos marcadores de negación en la misma oración)
-    - code-switching (mezcla aparente de palabras en inglés dentro del texto)
-    - sarcasmo / ironía (marcadores superficiales: risas, signos de exclamación
-      repetidos junto a emojis invertidos, expresiones irónicas típicas)
-
-Esto NO reemplaza una anotación manual por expertos (que sigue siendo necesaria
-para contrastar la hipótesis específica sobre fenómenos lingüísticos). Sirve para
-decidir, antes de diseñar los prompts, si hay evidencia mínima de cada fenómeno en
-el corpus o si conviene replantear esa hipótesis como exploratoria.
-
-Uso:
-    python scripts/data/audit_phenomena.py \
-        --input data/processed/dev.csv \
-        --out data/processed/auditoria_fenomenos.csv
-"""
+"""Auditoría previa del corpus: cuenta, con heurísticas simples (no con un modelo),"""
 from __future__ import annotations
 
 import argparse
@@ -29,7 +9,7 @@ import pandas as pd
 import regex as re
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from scripts.utils.io_utils import get_logger, read_table_any, write_csv  # noqa: E402
+from scripts.utils.io_utils import get_logger, read_table_any, write_csv
 
 logger = get_logger("audit_phenomena")
 
