@@ -2,7 +2,7 @@
 set -euo pipefail
 MODO="${1:-prueba}"
 MODELO="salamandra-7b-instruct"
-SALIDA="docs/experimento/llm_ollama"
+SALIDA="docs/experimento/llm"
 
 command -v ollama >/dev/null || { echo "Falta instalar Ollama (https://ollama.com)"; exit 1; }
 ollama list | grep -q "^${MODELO}" || ollama create "${MODELO}" -f scripts/experimento/ollama/Modelfile

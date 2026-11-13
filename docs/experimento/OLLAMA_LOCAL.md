@@ -1,6 +1,6 @@
 # Correr Salamandra en local con Ollama
 
-Guía para correr el monoagente (condición B1) sobre dev con Salamandra-7B-Instruct servido por Ollama, con parámetros fijos. Los resultados de cada corrida se guardan en `docs/experimento/llm_ollama/`.
+Guía para correr el monoagente (condición B1) sobre dev con Salamandra-7B-Instruct servido por Ollama, con parámetros fijos. Los resultados de cada corrida se guardan en `docs/experimento/llm/`.
 
 ## Pasos
 

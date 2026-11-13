@@ -1,7 +1,7 @@
 # Corrida local de Salamandra con Ollama (Windows). Ejecutar desde la raíz del repositorio.
 param([string]$Modo = "prueba")
 $Modelo = "salamandra-7b-instruct"
-$Salida = "docs/experimento/llm_ollama"
+$Salida = "docs/experimento/llm"
 if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) { Write-Error "Falta instalar Ollama (https://ollama.com)"; exit 1 }
 if (-not (ollama list | Select-String "^$Modelo")) { ollama create $Modelo -f scripts/experimento/ollama/Modelfile }
 pip install -q requests pyyaml pandas scikit-learn | Out-Null
