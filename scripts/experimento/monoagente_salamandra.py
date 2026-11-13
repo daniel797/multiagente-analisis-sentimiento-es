@@ -26,7 +26,19 @@ Uso (desde la raíz del repositorio)
     python scripts/experimento/monoagente_salamandra.py ejecutar --variantes base limpio --out docs/experimento/llm
     python scripts/experimento/monoagente_salamandra.py resumir --out docs/experimento/llm
 
-Dependencias del modelo real: torch, transformers, accelerate, bitsandbytes.
+    # corrida local con Ollama (modelo GGUF ya descargado; ver --ollama-modelo)
+    python scripts/experimento/monoagente_salamandra.py ejecutar --backend ollama --ollama-modelo salamandra-7b-instruct \
+        --semilla 42 --variantes base limpio --limite 50 --out docs/experimento/llm_ollama
+
+Dependencias del modelo real: torch, transformers, accelerate, bitsandbytes (backend transformers) o solo
+`requests` y un servidor Ollama en marcha (backend ollama).
+
+Corrida con Ollama: la llamada va a /api/chat con la plantilla de chat del propio modelo (Modelfile), los
+parámetros (temperature, top_p, top_k, seed, num_ctx, num_predict) por llamada y, por defecto, salida
+restringida a un esquema JSON con la etiqueta en {POS, NEG, NEU}. Además de las predicciones se guardan los
+tokens y el tiempo de cada llamada y un archivo `registro_corrida.json` con la versión de Ollama, el digest del
+modelo, la cuantización y todos los parámetros. Antes de usarla en serio, comprobar que la plantilla del
+Modelfile produce el mismo prompt que la de Hugging Face (ver `--mostrar-prompt`).
 """
 from __future__ import annotations
 
@@ -135,6 +147,49 @@ class BackendTransformers:
         return self.tok.batch_decode(nuevos, skip_special_tokens=True)
 
 
+class BackendOllama:
+    """Salamandra servida por Ollama (GGUF). Parámetros por llamada y semilla controlable.
+
+    Las llamadas son secuenciales. Guarda en `self.stats` los tokens y tiempos de la última tanda.
+    """
+
+    ESQUEMA = {"type": "object", "properties": {"label": {"type": "string", "enum": ETIQUETAS}}, "required": ["label"]}
+
+    def __init__(self, url: str, modelo: str, num_ctx: int = 4096, formato_json: bool = True, timeout: int = 300):
+        import requests
+
+        self.http, self.url, self.modelo, self.num_ctx, self.formato_json, self.timeout = requests.Session(), url.rstrip("/"), modelo, num_ctx, formato_json, timeout
+        self.stats: list[dict] = []
+        self.opciones_usadas: dict = {}
+
+    def metadatos(self) -> dict:
+        """Versión de Ollama y datos del modelo (digest, cuantización) para el registro de la corrida."""
+        info = {"ollama_version": self.http.get(f"{self.url}/api/version", timeout=30).json().get("version")}
+        det = self.http.post(f"{self.url}/api/show", json={"model": self.modelo}, timeout=60).json()
+        d = det.get("details", {})
+        info.update({"modelo": self.modelo, "familia": d.get("family"), "parametros": d.get("parameter_size"), "cuantizacion": d.get("quantization_level"),
+                     "formato": d.get("format"), "plantilla": det.get("template")})
+        for m in self.http.get(f"{self.url}/api/tags", timeout=30).json().get("models", []):
+            if m.get("name") == self.modelo or m.get("model") == self.modelo:
+                info["digest"] = m.get("digest")
+        return info
+
+    def generar(self, lotes: list[list[dict]], temperatura: float, semilla: int, top_p: float = 0.9, top_k: int = 40, max_new_tokens: int = 24, repeat_penalty: float = 1.0) -> list[str]:
+        opciones = {"temperature": temperatura, "top_p": top_p, "top_k": top_k, "seed": semilla, "num_ctx": self.num_ctx, "num_predict": max_new_tokens, "repeat_penalty": repeat_penalty}
+        self.opciones_usadas = opciones
+        salidas, self.stats = [], []
+        for mensajes in lotes:
+            cuerpo = {"model": self.modelo, "messages": mensajes, "stream": False, "options": opciones}
+            if self.formato_json:
+                cuerpo["format"] = self.ESQUEMA
+            r = self.http.post(f"{self.url}/api/chat", json=cuerpo, timeout=self.timeout)
+            r.raise_for_status()
+            j = r.json()
+            salidas.append(j.get("message", {}).get("content", ""))
+            self.stats.append({"tokens_prompt": j.get("prompt_eval_count", 0), "tokens_salida": j.get("eval_count", 0), "ms_total": round(j.get("total_duration", 0) / 1e6, 1)})
+        return salidas
+
+
 # ----------------------------------------------------------------------------
 # Ejecución
 # ----------------------------------------------------------------------------
@@ -178,23 +233,40 @@ def ejecutar(a: argparse.Namespace) -> None:
 
     if a.backend == "stub":
         backend = BackendStub()
+    elif a.backend == "ollama":
+        backend = BackendOllama(a.ollama_url, a.ollama_modelo, num_ctx=a.num_ctx, formato_json=not a.sin_formato_json)
+        if a.mostrar_prompt:
+            print(json.dumps(construir_mensajes(V.aplicar(datos["texto"].iloc[0], a.variantes[0])), ensure_ascii=False, indent=1))
+            print("Plantilla del Modelfile:\n" + str(backend.metadatos().get("plantilla")))
+            return
     else:
         if not (a.revision or modelo.get("revision")):
             print("AVISO: configs/model_config.yaml no fija `revision`. Fíjala antes de la corrida final para que sea reproducible.")
         backend = BackendTransformers(modelo["nombre"], a.revision or modelo.get("revision", ""), modelo.get("cuantizacion", ""))
 
     temperatura = a.temperatura
+    semilla = a.semilla if a.semilla is not None else dec.get("semilla", 42)
+    if a.backend == "ollama":
+        reg = {"fecha": pd.Timestamp.now().isoformat(timespec="seconds"), "version_prompt": VERSION_PROMPT, "split": a.split, "variantes": a.variantes,
+               "temperatura": temperatura, "top_p": dec.get("top_p", 0.9), "top_k": dec.get("top_k", 40), "semilla": semilla, "num_ctx": a.num_ctx,
+               "salida_restringida_json": not a.sin_formato_json, "reintentos_maximos": reintentos, **backend.metadatos()}
+        with open(out / "registro_corrida.json", "w", encoding="utf-8") as f:
+            json.dump(reg, f, ensure_ascii=False, indent=2)
     for variante in a.variantes:
         pendientes = datos[[(i, variante) not in hechas for i in datos["id"]]]
         print(f"variante={variante}: {len(pendientes)} tuits por clasificar ({len(datos) - len(pendientes)} ya hechos)")
         for ini in range(0, len(pendientes), a.lote):
             trozo = pendientes.iloc[ini:ini + a.lote]
-            res = clasificar_lote(backend, [V.aplicar(t, variante) for t in trozo["texto"]], temperatura, dec.get("semilla", 42), reintentos, dec)
+            res = clasificar_lote(backend, [V.aplicar(t, variante) for t in trozo["texto"]], temperatura, semilla, reintentos, dec)
             filas = pd.DataFrame({
                 "id": trozo["id"].values, "variedad": trozo["variedad"].values, "etiqueta": trozo["etiqueta"].values,
                 "variante": variante, "version_prompt": VERSION_PROMPT, "pred": [r["pred"] or "" for r in res],
                 "intentos": [r["intentos"] for r in res], "salida_cruda": [r["salida_cruda"].replace("\n", " ")[:200] for r in res],
             })
+            if a.backend == "ollama":   # tokens y tiempo de la última llamada de cada tuit (los reintentos sobrescriben)
+                est = pd.DataFrame(backend.stats)
+                if len(est) == len(filas):
+                    filas["tokens_prompt"], filas["tokens_salida"], filas["ms_total"] = est["tokens_prompt"].astype(int).values, est["tokens_salida"].astype(int).values, est["ms_total"].values
             filas.to_csv(ruta, mode="a", header=not ruta.exists(), index=False, encoding="utf-8")
             print(f"  {min(ini + a.lote, len(pendientes))}/{len(pendientes)}", end="\r")
         print()
@@ -237,8 +309,14 @@ def main() -> None:
     e.add_argument("--config", default="configs/model_config.yaml")
     e.add_argument("--split", default="dev", choices=["dev", "train"])
     e.add_argument("--variantes", nargs="+", default=["base", "limpio"], choices=sorted(V.VARIANTES))
-    e.add_argument("--backend", default="transformers", choices=["transformers", "stub"])
+    e.add_argument("--backend", default="transformers", choices=["transformers", "stub", "ollama"])
     e.add_argument("--revision", default="")
+    e.add_argument("--ollama-url", default="http://localhost:11434")
+    e.add_argument("--ollama-modelo", default="salamandra-7b-instruct", help="nombre del modelo en Ollama (ollama list)")
+    e.add_argument("--semilla", type=int, default=None, help="semilla de muestreo (por defecto, la de configs/model_config.yaml)")
+    e.add_argument("--num-ctx", type=int, default=4096)
+    e.add_argument("--sin-formato-json", action="store_true", help="no restringir la salida al esquema JSON de Ollama")
+    e.add_argument("--mostrar-prompt", action="store_true", help="imprime el prompt y la plantilla del Modelfile y termina")
     e.add_argument("--temperatura", type=float, default=0.0, help="0 = decodificación determinista (recomendado para B1)")
     e.add_argument("--lote", type=int, default=16)
     e.add_argument("--limite", type=int, default=0, help="tuits en total, repartidos por variedad (0 = todos)")
