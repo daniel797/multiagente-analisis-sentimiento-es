@@ -48,6 +48,7 @@ import evaluacion as EV  # noqa: E402
 import feature_utils as F  # noqa: E402
 import optimizar_hiperparametros as H  # noqa: E402
 import variantes_datos as V  # noqa: E402
+import lexico_es as LX  # noqa: E402
 
 CLASES = ["NEG", "NEU", "POS"]
 SEMILLA = 0
@@ -55,11 +56,12 @@ AZUL, GRIS, ROJO, VERDE = "#2a78d6", "#b8b7b0", "#d9503f", "#3a9a5b"
 
 MODELOS = {
     "M0": "TF-IDF de palabras (baseline)",
-    "M1": "TF-IDF de caracteres (variante 1)",
-    "M2": "Palabras + 24 variables (variante 2)",
-    "M3": "Caracteres + 24 variables (variante 3)",
+    "M1": "Palabras + léxico ampliado (variante 1)",
+    "M2": "Caracteres + léxico ampliado (variante 2)",
+    "M3": "Palabras + caracteres + 24 variables + léxico ampliado (variante 3)",
     "V1": "24 variables solas (referencia)",
-    "V2": "Regla de léxico sin entrenamiento (referencia)",
+    "V2": "Regla de léxico mínimo sin entrenamiento (referencia)",
+    "V3": "Léxico ampliado solo, 8 rasgos (referencia)",
 }
 
 
@@ -91,25 +93,36 @@ class Representacion:
         self.nombre, self.var, self.excluir, self.cfg_car, self.cfg_pal = nombre, variante_texto, excluir_grupos, cfg_car or {}, cfg_pal or {}
 
     def _num_cols(self) -> list[str]:
-        return F._numericas([g for g in F.GRUPOS_NUM if g not in self.excluir])
+        cols: list[str] = []
+        if self.nombre in ("M3", "V1"):
+            cols += F._numericas([g for g in F.GRUPOS_NUM if g not in self.excluir])
+        if self.nombre in ("M1", "M2", "M3", "V3") and "lexico_amplio" not in self.excluir:
+            cols += list(LX.NOMBRES_RASGOS)
+        return cols
 
     @staticmethod
     def precalcular(*dfs: pd.DataFrame) -> None:
-        """Las 24 variables dependen solo del texto de cada tuit: se calculan una vez y se reutilizan en todos los pliegues."""
+        """Las 24 variables y los 8 rasgos del léxico ampliado dependen solo del texto de cada tuit (no de las etiquetas):
+        se calculan una vez y se reutilizan en todos los pliegues. El léxico ampliado usa lemas de spaCy (es_core_news_md)."""
+        import spacy
         cols = F._numericas(F.GRUPOS_NUM)
+        nlp = spacy.load("es_core_news_md", disable=["ner", "parser"])
         for df in dfs:
             df[cols] = F.construir_matriz(df)[cols].to_numpy()
+            base = df["texto"].map(lambda t: V.aplicar(t, "base")).tolist()
+            filas = [LX.rasgos(d, t) for d, t in zip(nlp.pipe(base, batch_size=256), df["texto"].tolist())]
+            df[LX.NOMBRES_RASGOS] = pd.DataFrame(filas)[LX.NOMBRES_RASGOS].to_numpy()
 
     def ajustar_transformar(self, tr: pd.DataFrame, va: pd.DataFrame):
         t_tr, t_va = tr["texto"].map(lambda t: V.aplicar(t, self.var)), va["texto"].map(lambda t: V.aplicar(t, self.var))
         partes_tr, partes_va = [], []
-        if self.nombre in ("M0", "M2"):
+        if self.nombre in ("M0", "M1", "M3"):
             v = _vec_palabras(**self.cfg_pal).fit(t_tr)
             partes_tr.append(v.transform(t_tr)); partes_va.append(v.transform(t_va))
-        if self.nombre in ("M1", "M3"):
+        if self.nombre in ("M2", "M3"):
             v = _vec_caracteres(**self.cfg_car).fit(t_tr)
             partes_tr.append(v.transform(t_tr)); partes_va.append(v.transform(t_va))
-        if self.nombre in ("M2", "M3", "V1") and self._num_cols():
+        if self._num_cols():
             cols = self._num_cols()
             Mtr, Mva = tr[cols], va[cols]
             sc = StandardScaler().fit(Mtr)
@@ -234,25 +247,25 @@ def main() -> None:
     cm.to_csv(T / "cv_matriz_confusion_elegido.csv")
 
     # --- 2. Optimización de hiperparámetros del modelo elegido --------------------------------------------
-    if elegido not in ("M0", "M1", "M3"):
-        sys.exit(f"El elegido es {elegido}: la búsqueda implementada es la de M0, M1 o M3.")
-    if elegido == "M3":   # caracteres + 24 variables: malla propia con la misma estructura que la de H.busqueda_cv
+    if elegido not in ("M0", "M2", "M3"):
+        sys.exit(f"El elegido es {elegido}: la búsqueda implementada es la de M0, M2 o M3.")
+    if elegido in ("M2", "M3"):   # con caracteres: malla propia con la misma estructura que la de H.busqueda_cv
         filas_b = []
         for ng in [(2, 3), (3, 4), (2, 5)]:
             for c_, p_ in itertools.product(H.VALORES_C, H.PESOS):
-                f_ = correr_cv(train, Representacion("M3", cfg_car={"ngram": ng}), c=c_, peso=p_)["folds"]
+                f_ = correr_cv(train, Representacion(elegido, cfg_car={"ngram": ng}), c=c_, peso=p_)["folds"]
                 m_, s_ = resumen(f_)
-                filas_b.append({"familia": "caracteres+variables", "ngram_range": str(ng), "min_df": 3, "C": c_, "class_weight": p_ or "ninguno", "macro_f1_cv": m_, "desv_cv": s_})
+                filas_b.append({"familia": "con caracteres", "ngram_range": str(ng), "min_df": 3, "C": c_, "class_weight": p_ or "ninguno", "macro_f1_cv": m_, "desv_cv": s_})
         busq = pd.DataFrame(filas_b).sort_values("macro_f1_cv", ascending=False).reset_index(drop=True)
     else:
-        familia = {"M0": "palabras", "M1": "caracteres"}[elegido]
+        familia = "palabras"
         busq = H.busqueda_cv(train, familias=(familia,), verbose=False)
     busq.round(4).to_csv(T / "optimizacion_busqueda_cv.csv", index=False)
     mejor = busq.iloc[0]
     print("mejor de la malla (etapa 1):", dict(mejor))
     peso = None if mejor["class_weight"] == "ninguno" else mejor["class_weight"]
     c_best = float(mejor["C"])
-    if elegido in ("M1", "M3"):
+    if elegido in ("M2", "M3"):
         cfg = {"ngram": eval(mejor["ngram_range"]), "min_df": int(mejor["min_df"]), "analyzer": "char_wb", "max_features": 60000}
         # Etapa 2: refinamiento alrededor del mejor punto (tipo de n-grama, tamaño del vocabulario y min_df)
         ref = []
@@ -320,16 +333,24 @@ def main() -> None:
         registrar("Texto de entrada", "base", var, r["folds"], r["oof"], ctrl_f, ctrl_o)
         print("variante de datos", var, "%.4f" % resumen(r["folds"])[0])
     # 3b. grupos de variables en M2 (palabras + 24 variables)
-    for mm in ("M2", "M3"):
-        for g in F.GRUPOS_NUM:
+    for mm in ("M3",):
+        for g in tuple(F.GRUPOS_NUM) + ("lexico_amplio",):
             r = correr_cv(train, Representacion(mm, excluir_grupos=(g,)))
             registrar(f"Grupo de variables (en {mm})", f"{mm} completo", f"{mm} sin {g}", r["folds"], r["oof"], res[mm], oof[mm])
         r = correr_cv(train, Representacion(mm, excluir_grupos=tuple(F.GRUPOS_NUM)))
-        registrar(f"Grupo de variables (en {mm})", f"{mm} completo", f"{mm} sin ninguna variable", r["folds"], r["oof"], res[mm], oof[mm])
+        registrar(f"Grupo de variables (en {mm})", f"{mm} completo", f"{mm} sin las 24 variables (queda el léxico ampliado)", r["folds"], r["oof"], res[mm], oof[mm])
+        r = correr_cv(train, Representacion(mm, excluir_grupos=tuple(F.GRUPOS_NUM) + ("lexico_amplio",)))
+        registrar(f"Grupo de variables (en {mm})", f"{mm} completo", f"{mm} sin ninguna variable (solo texto)", r["folds"], r["oof"], res[mm], oof[mm])
+    # 3b2. el léxico ampliado en M1 y M2 (se quita y queda el texto solo)
+    for mm in ("M1", "M2"):
+        r = correr_cv(train, Representacion(mm, excluir_grupos=("lexico_amplio",)))
+        registrar("Léxico ampliado", f"{mm} completo", f"{mm} sin léxico ampliado", r["folds"], r["oof"], res[mm], oof[mm])
     # 3c. solo un grupo de variables (modelo de 24 variables)
     for g in F.GRUPOS_NUM:
         r = correr_cv(train, Representacion("V1", excluir_grupos=tuple(x for x in F.GRUPOS_NUM if x != g)))
         registrar("Solo un grupo (modelo de variables)", "V1: 24 variables", f"solo {g}", r["folds"], r["oof"], res["V1"], oof["V1"])
+    r = correr_cv(train, Representacion("V3"))
+    registrar("Solo un grupo (modelo de variables)", "V1: 24 variables", "solo lexico_amplio", r["folds"], r["oof"], res["V1"], oof["V1"])
     # 3d. peso de clases en el modelo elegido
     r = correr_cv(train, Representacion(elegido), peso=None)
     registrar("Peso de clases", "balanceado", "sin balancear", r["folds"], r["oof"], ctrl_f, ctrl_o)
@@ -370,7 +391,7 @@ def main() -> None:
     if pd.isna(preds["LLM"]).any():
         sys.exit("Hay tuits de dev sin predicción del LLM.")
     filas, difs = [], []
-    nombres = {"M0": "M0 baseline", "M1": "M1 caracteres", "M2": "M2 palabras + 24 variables", "M3": "M3 caracteres + 24 variables", "V1": "V1 24 variables", "V2": "V2 regla de léxico", "opt": f"{elegido} optimizado", "LLM": "Salamandra monoagente (B1)"}
+    nombres = {"M0": "M0 baseline", "M1": "M1 palabras + léxico ampliado", "M2": "M2 caracteres + léxico ampliado", "M3": "M3 palabras + caracteres + variables + léxico", "V1": "V1 24 variables", "V2": "V2 regla de léxico", "opt": f"{elegido} optimizado", "LLM": "Salamandra monoagente (B1)"}
     for n in ("M0", "M1", "M2", "M3", "V1", "V2", "opt", "LLM"):
         for amb, mk in EV.ambitos(dev["variedad"]).items():
             r = EV.metricas(yd[mk], preds[n][mk], a.n_boot)
@@ -409,11 +430,11 @@ def main() -> None:
     ancho = 0.16
     for i, (n, col) in enumerate((("M0", GRIS), ("M1", AZUL), ("M2", VERDE), ("M3", "#e0a030"), ("opt", ROJO))):
         ax.bar(np.arange(1, 6) + (i - 2) * ancho, res[n]["macro_f1_valid"], ancho, label={"opt": f"{elegido} optimizado"}.get(n, n), color=col)
-    ax.set_xlabel("Pliegue"); ax.set_ylabel("Macro-F1 de validación"); ax.set_ylim(0.45, 0.62); ax.set_xticks(range(1, 6))
-    ax.set_title("Macro-F1 en cada pliegue"); ax.legend(ncol=4, fontsize=8, loc="upper center"); plt.tight_layout(); plt.savefig(out / "figuras" / "fig01_folds.png", dpi=170); plt.close()
+    ax.set_xlabel("Pliegue"); ax.set_ylabel("Macro-F1 de validación"); ax.set_ylim(0.45, 0.67); ax.set_xticks(range(1, 6))
+    ax.set_title("Macro-F1 en cada pliegue"); ax.legend(ncol=5, fontsize=8, loc="upper center"); plt.tight_layout(); plt.savefig(out / "figuras" / "fig01_folds.png", dpi=170); plt.close()
 
     ab_df = pd.DataFrame(ab)
-    sel = ab_df[ab_df.componente.isin(["Texto de entrada", "Grupo de variables (en M2)", "Peso de clases", "Hiperparámetros"])].reset_index(drop=True)
+    sel = ab_df[ab_df.componente.isin(["Texto de entrada", "Grupo de variables (en M3)", "Léxico ampliado", "Peso de clases", "Hiperparámetros"])].reset_index(drop=True)
     fig, ax = plt.subplots(figsize=(7.5, 0.34 * len(sel) + 1.2))
     ax.barh(range(len(sel)), sel["dif_contra_control"], xerr=[sel["dif_contra_control"] - sel["ic_inf"], sel["ic_sup"] - sel["dif_contra_control"]], color=AZUL, capsize=2)
     ax.axvline(0, color="black", lw=0.8); ax.set_yticks(range(len(sel)), sel["configuracion"]); ax.invert_yaxis()

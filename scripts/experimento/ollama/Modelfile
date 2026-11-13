@@ -1,0 +1,25 @@
+# Salamandra-7B-Instruct (BSC-LT) para clasificación de sentimiento con Ollama.
+# Ajusta la ruta del GGUF a donde lo hayas descargado. Cuantización recomendada: Q8_0 (casi sin pérdida, ~8 GB de VRAM);
+# si no cabe, Q5_K_M o Q4_K_M (esta última es la más cercana al 4-bit de la corrida de Colab).
+FROM ./salamandra-7b-instruct.Q8_0.gguf
+
+# Decodificación determinista: es una tarea de clasificación con tres respuestas posibles, no hace falta creatividad.
+PARAMETER temperature 0
+PARAMETER top_k 1
+PARAMETER top_p 1.0
+PARAMETER repeat_penalty 1.0
+PARAMETER seed 42
+# El prompt de la tarea + el tuit caben en ~700 tokens; 4096 deja margen y evita que Ollama use un contexto mayor y más lento.
+PARAMETER num_ctx 4096
+# La respuesta es un JSON corto como {"label": "NEG"}.
+PARAMETER num_predict 24
+PARAMETER stop "<|im_end|>"
+
+# Plantilla de chat (ChatML, la que usa Salamandra). Si importas el GGUF con `ollama pull hf.co/...` y el repositorio ya trae
+# la plantilla, borra este bloque TEMPLATE y verifica con --mostrar-prompt que el prompt es el mismo que el de Hugging Face.
+TEMPLATE """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""
